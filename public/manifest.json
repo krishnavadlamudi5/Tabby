@@ -1,0 +1,21 @@
+{
+  "short_name": "Splitwise",
+  "name": "Splitwise Expense Splitter",
+  "icons": [
+    {
+      "src": "pwa-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "pwa-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#FAF8F5",
+  "theme_color": "#3C5A48",
+  "display": "standalone",
+  "orientation": "portrait"
+}

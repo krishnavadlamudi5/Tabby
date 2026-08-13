@@ -1,0 +1,6 @@
+{
+  "name": "Tabby",
+  "description": "A beautiful, fully functional Splitwise replica for splitting bills, calculating balances, adding complex expenses, and simplifying group debts with local storage persistence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

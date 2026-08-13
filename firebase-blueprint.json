@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "users": {
+      "title": "users",
+      "description": "User profiles",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "avatar": { "type": "string" }
+      },
+      "required": ["id", "name", "email"]
+    },
+    "groups": {
+      "title": "groups",
+      "description": "Expense sharing groups",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "avatar": { "type": "string" },
+        "members": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "members"]
+    },
+    "expenses": {
+      "title": "expenses",
+      "description": "Shared expenses and bills",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "paidBy": { "type": "string" },
+        "groupId": { "type": "string" },
+        "category": { "type": "string" },
+        "date": { "type": "string" },
+        "splits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userId": { "type": "string" },
+              "amount": { "type": "number" }
+            }
+          }
+        },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "description", "amount", "paidBy", "splits"]
+    },
+    "settlements": {
+      "title": "settlements",
+      "description": "Debt settlement records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fromUserId": { "type": "string" },
+        "toUserId": { "type": "string" },
+        "amount": { "type": "number" },
+        "groupId": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "fromUserId", "toUserId", "amount"]
+    },
+    "activities": {
+      "title": "activities",
+      "description": "Activity feed logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "userId": { "type": "string" },
+        "description": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "type", "userId", "description", "timestamp"]
+    }
+  }
+}
