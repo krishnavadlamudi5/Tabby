@@ -66,9 +66,9 @@ export default function App() {
     { type: 'notifications' }
   >({ type: 'dashboard' });
 
-  // App Update Notification Banner State
-  const [isAppUpdateAvailable, setIsAppUpdateAvailable] = useState<boolean>(true);
-  const [showAppUpdateBanner, setShowAppUpdateBanner] = useState<boolean>(true);
+  // App Update Notification Banner State (Hidden by default unless explicitly triggered)
+  const [isAppUpdateAvailable, setIsAppUpdateAvailable] = useState<boolean>(false);
+  const [showAppUpdateBanner, setShowAppUpdateBanner] = useState<boolean>(false);
 
   // Responsive Drawer Toggle
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -306,6 +306,15 @@ export default function App() {
       return updated;
     });
 
+    // Update currentUser's friendIds list
+    const updatedUser: User = {
+      ...currentUser,
+      friendIds: Array.from(new Set([...(currentUser.friendIds || []), newFriend.id])),
+    };
+    setCurrentUser(updatedUser);
+    localStorage.setItem('splitwise_user', JSON.stringify(updatedUser));
+    saveUserToFirestore(updatedUser);
+
     // Record addition log
     const newAct: Activity = {
       id: `act-${Date.now()}`,
@@ -491,17 +500,56 @@ export default function App() {
     }
   };
 
-  // Helper selectors
-  const friendsList = users.filter((u) => u.id !== currentUser?.id);
+  // User-scoped data selectors
+  const myGroups = React.useMemo(() => {
+    if (!currentUser) return [];
+    return groups.filter((g) => g.members.includes(currentUser.id));
+  }, [groups, currentUser]);
+
+  const myGroupIds = React.useMemo(() => {
+    return new Set(myGroups.map((g) => g.id));
+  }, [myGroups]);
+
+  const myFriends = React.useMemo(() => {
+    if (!currentUser) return [];
+    const friendIdSet = new Set(currentUser.friendIds || []);
+    myGroups.forEach((g) => {
+      g.members.forEach((mId) => {
+        if (mId !== currentUser.id) friendIdSet.add(mId);
+      });
+    });
+    return users.filter((u) => u.id !== currentUser.id && friendIdSet.has(u.id));
+  }, [users, myGroups, currentUser]);
+
+  const myExpenses = React.useMemo(() => {
+    if (!currentUser) return [];
+    return expenses.filter((e) => {
+      if (e.groupId) {
+        return myGroupIds.has(e.groupId);
+      }
+      return e.paidBy === currentUser.id || e.splits.some((s) => s.userId === currentUser.id);
+    });
+  }, [expenses, myGroupIds, currentUser]);
+
+  const myActivities = React.useMemo(() => {
+    if (!currentUser) return [];
+    return activities.filter((act) => {
+      if (act.type === 'app_update') return true;
+      if (act.userId === currentUser.id) return true;
+      return myGroups.some((g) => act.description.includes(g.name));
+    });
+  }, [activities, myGroups, currentUser]);
+
+  const friendsList = myFriends;
   const activeGroup = activeView.type === 'group' ? groups.find((g) => g.id === activeView.id) : null;
   const activeFriend = activeView.type === 'friend' ? users.find((u) => u.id === activeView.id) : null;
 
-  const filteredGroups = groups.filter((g) => {
+  const filteredGroups = myGroups.filter((g) => {
     if (!sidebarSearchQuery.trim()) return true;
     return g.name.toLowerCase().includes(sidebarSearchQuery.toLowerCase().trim());
   });
 
-  const filteredFriends = friendsList.filter((f) => {
+  const filteredFriends = myFriends.filter((f) => {
     if (!sidebarSearchQuery.trim()) return true;
     const q = sidebarSearchQuery.toLowerCase().trim();
     return (
@@ -847,8 +895,8 @@ export default function App() {
               <DashboardView
                 currentUser={currentUser}
                 allUsers={users}
-                expenses={expenses}
-                activities={activities}
+                expenses={myExpenses}
+                activities={myActivities}
                 currency={currency}
                 onSettleDebt={(fromId, toId, amt, gid) => handleOpenSettleModal(fromId, toId, amt, gid)}
                 onNavigateToFriend={(fid) => setActiveView({ type: 'friend', id: fid })}
@@ -858,7 +906,7 @@ export default function App() {
             {activeView.type === 'group' && activeGroup && (
               <GroupView
                 group={activeGroup}
-                expenses={expenses}
+                expenses={myExpenses}
                 currentUser={currentUser}
                 allUsers={users}
                 currency={currency}
@@ -875,7 +923,7 @@ export default function App() {
             {activeView.type === 'friend' && activeFriend && (
               <FriendView
                 friend={activeFriend}
-                expenses={expenses}
+                expenses={myExpenses}
                 currentUser={currentUser}
                 allUsers={users}
                 currency={currency}
@@ -893,7 +941,7 @@ export default function App() {
               <NotificationsView
                 currentUser={currentUser}
                 allUsers={users}
-                activities={activities}
+                activities={myActivities}
                 onNavigateToGroup={(gid) => setActiveView({ type: 'group', id: gid })}
                 onNavigateToFriend={(fid) => setActiveView({ type: 'friend', id: fid })}
                 onSimulateAppUpdate={handleSimulateAppUpdate}
@@ -908,8 +956,8 @@ export default function App() {
         isOpen={isExpenseModalOpen}
         onClose={() => setIsExpenseModalOpen(false)}
         currentUser={currentUser}
-        friends={friendsList}
-        groups={groups}
+        friends={myFriends}
+        groups={myGroups}
         allUsers={users}
         currency={currency}
         onAddExpense={handleAddExpense}

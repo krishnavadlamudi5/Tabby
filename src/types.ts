@@ -10,6 +10,7 @@ export interface User {
   phone?: string;
   password?: string;
   avatar?: string;
+  friendIds?: string[];
 }
 
 export type GroupCategory = 'trip' | 'home' | 'couple' | 'other';

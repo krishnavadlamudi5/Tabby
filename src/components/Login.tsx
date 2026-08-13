@@ -6,7 +6,18 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { DEMO_USERS } from '../data/demoData';
-import { Sparkles, ArrowRight, Phone, Lock, ShieldCheck, RefreshCw, KeyRound, CheckCircle2 } from 'lucide-react';
+import { 
+  Sparkles, 
+  ArrowRight, 
+  Phone, 
+  Mail, 
+  Lock, 
+  ShieldCheck, 
+  RefreshCw, 
+  User as UserIcon, 
+  CheckCircle2,
+  ChevronRight
+} from 'lucide-react';
 import AppLogo from './AppLogo';
 
 interface LoginProps {
@@ -28,91 +39,117 @@ const COUNTRY_CODES = [
 ];
 
 export default function Login({ onLogin }: LoginProps) {
-  const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone');
-  const [isNewUser, setIsNewUser] = useState(false);
+  // Main Tab: 'signin' or 'register'
+  const [activeTab, setActiveTab] = useState<'signin' | 'register'>('signin');
 
-  // Phone registration / login state
+  // Input states
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [countryCode, setCountryCode] = useState('+1');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [otpMethod, setOtpMethod] = useState<'sms' | 'email'>('sms');
 
-  // OTP Verification state
-  const [phoneStep, setPhoneStep] = useState<'input' | 'otp' | 'set_password'>('input');
+  // Flow & error states
+  const [step, setStep] = useState<'form' | 'otp'>('form');
   const [generatedOtp, setGeneratedOtp] = useState<string>('');
   const [enteredOtp, setEnteredOtp] = useState<string>('');
-  const [otpError, setOtpError] = useState<string>('');
-  const [loginError, setLoginError] = useState<string>('');
+  const [errorMsg, setErrorMsg] = useState<string>('');
   const [otpNotice, setOtpNotice] = useState<string>('');
 
   const fullPhone = `${countryCode}${phoneNumber.trim()}`;
 
-  // Step 1: Send OTP for Phone Sign-up or Phone OTP Login
-  const handleSendOtp = (e: React.FormEvent) => {
+  // 1-Tap Google Sign-In Handler
+  const handleGoogleSignIn = () => {
+    const googleUser: User = {
+      id: `user-google-${Date.now()}`,
+      name: 'Alex Morgan',
+      email: 'alex.morgan@gmail.com',
+      phone: '+1 555-0199',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
+    };
+    onLogin(googleUser);
+  };
+
+  // Direct Sign In (Email or Phone + Password)
+  const handleSignInSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginError('');
-    setOtpError('');
+    setErrorMsg('');
 
+    const loginIdentifier = email.trim() || phoneNumber.trim();
+    if (!loginIdentifier || !password) {
+      setErrorMsg('Please enter your email/phone number and password');
+      return;
+    }
+
+    // Match existing user from demo data or created users
+    const matchedUser = DEMO_USERS.find(
+      (u) =>
+        u.email.toLowerCase() === loginIdentifier.toLowerCase() ||
+        u.phone === fullPhone ||
+        u.phone?.replace(/\D/g, '') === loginIdentifier.replace(/\D/g, '')
+    );
+
+    const userToLogin: User = matchedUser || {
+      id: `user-${Date.now()}`,
+      name: loginIdentifier.includes('@')
+        ? loginIdentifier.split('@')[0]
+        : `User ${loginIdentifier.slice(-4)}`,
+      email: loginIdentifier.includes('@')
+        ? loginIdentifier
+        : `${loginIdentifier.replace(/\D/g, '')}@tabby.app`,
+      phone: loginIdentifier.includes('@') ? undefined : fullPhone,
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
+    };
+
+    onLogin(userToLogin);
+  };
+
+  // Start Registration & Generate OTP
+  const handleStartRegistration = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+
+    if (!name.trim()) {
+      setErrorMsg('Please enter your full name');
+      return;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      setErrorMsg('Please enter a valid email address');
+      return;
+    }
     if (phoneNumber.replace(/\D/g, '').length < 7) {
-      setLoginError('Please enter a valid mobile number (at least 7 digits)');
+      setErrorMsg('Please enter a valid mobile number (at least 7 digits)');
+      return;
+    }
+    if (!password || password.length < 4) {
+      setErrorMsg('Password must be at least 4 characters long');
       return;
     }
 
-    if (isNewUser && !name.trim()) {
-      setLoginError('Please enter your full name');
-      return;
-    }
-
-    // Generate random 6-digit OTP code
+    // Generate 6-digit OTP code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(code);
-    setPhoneStep('otp');
-    setOtpNotice(`SMS sent to ${fullPhone}. Use code: ${code}`);
+    setStep('otp');
+
+    const destination = otpMethod === 'sms' ? fullPhone : email.trim();
+    setOtpNotice(`Verification code sent via ${otpMethod.toUpperCase()} to ${destination}. Demo code: ${code}`);
   };
 
-  // Step 2: Verify OTP
+  // Verify OTP & Complete Registration
   const handleVerifyOtp = (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg('');
+
     if (enteredOtp.trim() !== generatedOtp) {
-      setOtpError('Invalid OTP code. Please check and try again.');
-      return;
-    }
-
-    setOtpError('');
-    if (isNewUser) {
-      // Move to password setting for new user
-      setPhoneStep('set_password');
-    } else {
-      // Complete OTP login for returning user
-      const foundUser = DEMO_USERS.find(
-        (u) => u.phone === fullPhone || u.phone?.replace(/\D/g, '') === fullPhone.replace(/\D/g, '')
-      );
-
-      const userToLogin: User = foundUser || {
-        id: `user-phone-${Date.now()}`,
-        name: name.trim() || `User ${phoneNumber.slice(-4)}`,
-        email: `${phoneNumber.replace(/\D/g, '')}@splitwise.app`,
-        phone: fullPhone,
-        avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
-      };
-
-      onLogin(userToLogin);
-    }
-  };
-
-  // Step 3: Complete Password creation & sign up
-  const handleCompleteRegistration = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password || password.length < 4) {
-      setOtpError('Password must be at least 4 characters long');
+      setErrorMsg('Invalid OTP code. Please check and try again.');
       return;
     }
 
     const newUser: User = {
       id: `user-${Date.now()}`,
       name: name.trim(),
-      email: email.trim() || `${phoneNumber.replace(/\D/g, '')}@splitwise.app`,
+      email: email.trim(),
       phone: fullPhone,
       password: password,
       avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 1000000)}?auto=format&fit=crop&w=150&h=150&q=80`,
@@ -121,163 +158,181 @@ export default function Login({ onLogin }: LoginProps) {
     onLogin(newUser);
   };
 
-  // Password-based returning user login
-  const handlePasswordLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
-
-    if (!phoneNumber.trim() || !password) {
-      setLoginError('Please enter phone number and password');
-      return;
-    }
-
-    const foundUser = DEMO_USERS.find(
-      (u) => u.phone === fullPhone || u.phone?.replace(/\D/g, '') === fullPhone.replace(/\D/g, '')
-    );
-
-    const loggedUser: User = foundUser || {
-      id: `user-phone-${phoneNumber.replace(/\D/g, '')}`,
-      name: `User ${phoneNumber.slice(-4)}`,
-      email: `${phoneNumber.replace(/\D/g, '')}@splitwise.app`,
-      phone: fullPhone,
-      password: password,
-      avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
-    };
-
-    onLogin(loggedUser);
-  };
-
-  // Email login form submit
-  const handleEmailSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isNewUser) {
-      if (!name.trim() || !email.trim()) return;
-      const newUser: User = {
-        id: `user-${Date.now()}`,
-        name: name.trim(),
-        email: email.trim(),
-        avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 1000000)}?auto=format&fit=crop&w=150&h=150&q=80`,
-      };
-      onLogin(newUser);
-    } else {
-      const matchedUser = DEMO_USERS.find(
-        (u) => u.email.toLowerCase() === email.toLowerCase()
-      ) || DEMO_USERS[0];
-      onLogin(matchedUser);
-    }
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F5F2] p-4 md:p-6" id="login-container">
-      <div className="w-full max-w-md bg-white border border-[#E6E1DA] rounded-2xl shadow-sm p-6 md:p-8 flex flex-col gap-6" id="login-card">
-        {/* Brand Header */}
+      <div className="w-full max-w-md bg-white border border-[#E6E1DA] rounded-3xl shadow-md p-6 md:p-8 flex flex-col gap-6" id="login-card">
+        
+        {/* Brand Logo Header */}
         <div className="flex flex-col items-center text-center gap-2" id="brand-header">
           <AppLogo size="lg" showText={true} />
-          <p className="text-sm text-[#736F6A] max-w-xs mt-1" id="brand-tagline">
+          <p className="text-xs text-[#736F6A] max-w-xs mt-1" id="brand-tagline">
             Split bills, track expenses, and settle debts with friends easily.
           </p>
         </div>
 
-        {/* Demo Personas Grid */}
-        <div className="flex flex-col gap-3" id="demo-personas-section">
-          <div className="flex items-center justify-between" id="demo-personas-header">
-            <span className="text-xs font-semibold text-[#736F6A] uppercase tracking-wider">Quick Demo Login</span>
-            <span className="text-xs text-[#3C5A48] font-semibold flex items-center gap-1">
-              <Sparkles className="w-3 h-3" /> Ready to test
-            </span>
-          </div>
-          
-          <div className="grid grid-cols-1 gap-2" id="demo-personas-grid">
-            {DEMO_USERS.map((user) => (
-              <button
-                key={user.id}
-                onClick={() => onLogin(user)}
-                className="flex items-center justify-between p-3 border border-[#E6E1DA] rounded-xl hover:border-[#3C5A48] hover:bg-[#EBF1ED]/40 transition-all text-left group cursor-pointer"
-                type="button"
-                id={`demo-user-btn-${user.id}`}
-              >
-                <div className="flex items-center gap-3">
-                  <img
-                    src={user.avatar}
-                    alt={user.name}
-                    className="w-9 h-9 rounded-full object-cover border border-[#E6E1DA]"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div>
-                    <h3 className="text-sm font-semibold text-[#2C2B29]">{user.name}</h3>
-                    <p className="text-xs text-[#736F6A]">{user.email}</p>
-                  </div>
-                </div>
-                <ArrowRight className="w-4 h-4 text-[#736F6A]/50 group-hover:text-[#3C5A48] transition-colors" />
-              </button>
-            ))}
-          </div>
+        {/* 1-Tap Google Sign In */}
+        <div className="flex flex-col gap-3" id="social-auth-section">
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            className="w-full py-2.5 px-4 bg-white border border-[#E6E1DA] hover:border-[#3C5A48] hover:bg-[#FAF8F5] text-[#2C2B29] font-bold text-sm rounded-2xl transition-all shadow-2xs flex items-center justify-center gap-3 cursor-pointer group"
+            id="google-signin-btn"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.39 7.34 24 12 24z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.16 0 9.98 0 12s.45 3.84 1.24 5.42l4.04-3.15z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.61 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+              />
+            </svg>
+            <span>Continue with Google</span>
+            <ChevronRight className="w-4 h-4 text-[#736F6A] group-hover:translate-x-0.5 transition-transform ml-auto" />
+          </button>
         </div>
 
-        <div className="relative flex py-1 items-center" id="divider-section">
+        {/* Divider */}
+        <div className="relative flex py-1 items-center" id="auth-divider">
           <div className="flex-grow border-t border-[#E6E1DA]"></div>
-          <span className="flex-shrink mx-4 text-xs font-semibold text-[#736F6A] uppercase tracking-wider">Or Mobile & Email Registration</span>
+          <span className="flex-shrink mx-3 text-[11px] font-bold text-[#736F6A] uppercase tracking-wider">
+            Or Use Account Credentials
+          </span>
           <div className="flex-grow border-t border-[#E6E1DA]"></div>
         </div>
 
-        {/* Auth Method Selector (Mobile vs Email) */}
-        <div className="grid grid-cols-2 p-1 bg-[#FAF8F5] rounded-xl border border-[#E6E1DA]" id="auth-method-tabs">
+        {/* Auth Mode Tabs: Sign In vs Create Account */}
+        <div className="grid grid-cols-2 p-1 bg-[#FAF8F5] rounded-2xl border border-[#E6E1DA]" id="auth-tabs">
           <button
             type="button"
             onClick={() => {
-              setAuthMethod('phone');
-              setPhoneStep('input');
-              setLoginError('');
+              setActiveTab('signin');
+              setStep('form');
+              setErrorMsg('');
             }}
-            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              authMethod === 'phone'
+            className={`py-2.5 text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'signin'
                 ? 'bg-white text-[#3C5A48] shadow-xs border border-[#E6E1DA]'
                 : 'text-[#736F6A] hover:text-[#2C2B29]'
             }`}
+            id="tab-signin-btn"
           >
-            <Phone className="w-3.5 h-3.5" /> Mobile Number
+            <Lock className="w-3.5 h-3.5" /> Log In
           </button>
           <button
             type="button"
             onClick={() => {
-              setAuthMethod('email');
-              setLoginError('');
+              setActiveTab('register');
+              setStep('form');
+              setErrorMsg('');
             }}
-            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              authMethod === 'email'
+            className={`py-2.5 text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'register'
                 ? 'bg-white text-[#3C5A48] shadow-xs border border-[#E6E1DA]'
                 : 'text-[#736F6A] hover:text-[#2C2B29]'
             }`}
+            id="tab-register-btn"
           >
-            Email Login
+            <UserIcon className="w-3.5 h-3.5" /> Create Account
           </button>
         </div>
 
-        {/* PHONE REGISTRATION / LOGIN FLOW */}
-        {authMethod === 'phone' && (
-          <div className="flex flex-col gap-4" id="phone-auth-container">
-            {/* Step 1: Input Mobile Number & Name */}
-            {phoneStep === 'input' && (
-              <form onSubmit={isNewUser ? handleSendOtp : handlePasswordLogin} className="flex flex-col gap-3.5">
-                {loginError && (
-                  <div className="p-3 text-xs bg-red-50 text-red-700 border border-red-200 rounded-xl font-medium">
-                    {loginError}
-                  </div>
-                )}
+        {/* Error Alert Box */}
+        {errorMsg && (
+          <div className="p-3 text-xs bg-red-50 text-red-700 border border-red-200 rounded-xl font-semibold flex items-start gap-2">
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
-                {isNewUser && (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-[#2C2B29]">Full Name</label>
+        {/* STEP 1: FORM INPUTS */}
+        {step === 'form' && (
+          <>
+            {/* SIGN IN FORM */}
+            {activeTab === 'signin' && (
+              <form onSubmit={handleSignInSubmit} className="flex flex-col gap-4 animate-fadeIn" id="signin-form">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-[#2C2B29]">Email or Mobile Number</label>
+                  <div className="relative">
                     <input
                       type="text"
-                      placeholder="Alex Morgan"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required={isNewUser}
-                      className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/30 text-[#2C2B29]"
+                      placeholder="alex.morgan@gmail.com or 555-0199"
+                      value={email || phoneNumber}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.includes('@') || /[a-zA-Z]/.test(val)) {
+                          setEmail(val);
+                          setPhoneNumber('');
+                        } else {
+                          setPhoneNumber(val);
+                          setEmail('');
+                        }
+                      }}
+                      required
+                      className="w-full px-3.5 py-2.5 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/40 text-[#2C2B29]"
                     />
                   </div>
-                )}
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#2C2B29]">Password</label>
+                  </div>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="px-3.5 py-2.5 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/40 text-[#2C2B29]"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full mt-1 py-3 px-4 bg-[#3C5A48] hover:bg-[#2E4738] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+                  id="submit-signin-btn"
+                >
+                  <span>Sign In</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </form>
+            )}
+
+            {/* CREATE ACCOUNT / REGISTRATION FORM */}
+            {activeTab === 'register' && (
+              <form onSubmit={handleStartRegistration} className="flex flex-col gap-3.5 animate-fadeIn" id="register-form">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-[#2C2B29]">Full Name</label>
+                  <input
+                    type="text"
+                    placeholder="Alex Morgan"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/40 text-[#2C2B29]"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-[#2C2B29]">Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="alex.morgan@gmail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/40 text-[#2C2B29]"
+                  />
+                </div>
 
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-[#2C2B29]">Mobile Number</label>
@@ -285,12 +340,11 @@ export default function Login({ onLogin }: LoginProps) {
                     <select
                       value={countryCode}
                       onChange={(e) => setCountryCode(e.target.value)}
-                      className="px-3 py-2 border border-[#E6E1DA] rounded-xl text-xs font-bold bg-white text-[#2C2B29] focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] cursor-pointer shadow-2xs shrink-0 max-w-[150px]"
-                      id="country-code-select"
+                      className="px-2.5 py-2 border border-[#E6E1DA] rounded-xl text-xs font-bold bg-white text-[#2C2B29] focus:outline-none focus:border-[#3C5A48] shadow-2xs shrink-0 max-w-[130px]"
                     >
                       {COUNTRY_CODES.map((c) => (
                         <option key={`${c.code}-${c.iso}`} value={c.code}>
-                          {c.code} ({c.iso}) - {c.name}
+                          {c.code} ({c.iso})
                         </option>
                       ))}
                     </select>
@@ -300,215 +354,161 @@ export default function Login({ onLogin }: LoginProps) {
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
                       required
-                      className="flex-1 px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/30 text-[#2C2B29]"
+                      className="flex-1 px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/40 text-[#2C2B29]"
                     />
                   </div>
                 </div>
 
-                {!isNewUser && (
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-[#2C2B29]">Password</label>
-                      <button
-                        type="button"
-                        onClick={handleSendOtp}
-                        className="text-[11px] font-bold text-[#3C5A48] hover:underline"
-                      >
-                        Sign in via OTP instead
-                      </button>
-                    </div>
-                    <input
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required={!isNewUser}
-                      className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/30 text-[#2C2B29]"
-                    />
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  className="w-full mt-1 py-2.5 px-4 bg-[#3C5A48] hover:bg-[#2E4738] text-white font-semibold text-sm rounded-xl transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  {isNewUser ? 'Send Verification OTP' : 'Sign In with Mobile'}
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
-            )}
-
-            {/* Step 2: OTP Verification Prompt */}
-            {phoneStep === 'otp' && (
-              <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4 animate-fadeIn">
-                <div className="p-3 bg-[#EBF1ED] border border-[#3C5A48]/30 rounded-xl flex items-start gap-2.5">
-                  <ShieldCheck className="w-5 h-5 text-[#3C5A48] flex-shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <p className="font-bold text-[#2C2B29]">OTP Verification Sent</p>
-                    <p className="text-[#3C5A48] font-semibold mt-0.5">{otpNotice}</p>
-                  </div>
-                </div>
-
-                {otpError && (
-                  <div className="p-3 text-xs bg-red-50 text-red-700 border border-red-200 rounded-xl font-medium">
-                    {otpError}
-                  </div>
-                )}
-
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-[#2C2B29]">Enter 6-Digit OTP Code</label>
-                  <input
-                    type="text"
-                    maxLength={6}
-                    placeholder="123456"
-                    value={enteredOtp}
-                    onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
-                    required
-                    className="px-3.5 py-2.5 border border-[#E6E1DA] rounded-xl text-center tracking-widest text-lg font-mono font-bold focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-white text-[#2C2B29]"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 px-4 bg-[#3C5A48] hover:bg-[#2E4738] text-white font-semibold text-sm rounded-xl transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  Verify OTP & Continue
-                  <CheckCircle2 className="w-4 h-4" />
-                </button>
-
-                <div className="flex items-center justify-between text-xs text-[#736F6A]">
-                  <button
-                    type="button"
-                    onClick={() => setPhoneStep('input')}
-                    className="hover:text-[#2C2B29] underline"
-                  >
-                    Change Mobile Number
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const code = Math.floor(100000 + Math.random() * 900000).toString();
-                      setGeneratedOtp(code);
-                      setOtpNotice(`Resent SMS to ${fullPhone}. Use code: ${code}`);
-                    }}
-                    className="text-[#3C5A48] font-bold flex items-center gap-1 hover:underline"
-                  >
-                    <RefreshCw className="w-3 h-3" /> Resend OTP
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Step 3: Set Password / PIN for New User */}
-            {phoneStep === 'set_password' && (
-              <form onSubmit={handleCompleteRegistration} className="flex flex-col gap-4 animate-fadeIn">
-                <div className="p-3 bg-[#EBF1ED] border border-[#3C5A48]/30 rounded-xl flex items-center gap-2">
-                  <KeyRound className="w-5 h-5 text-[#3C5A48]" />
-                  <div className="text-xs">
-                    <p className="font-bold text-[#2C2B29]">Mobile Verified! Set Password</p>
-                    <p className="text-[#736F6A]">Set a password to easily log in next time.</p>
-                  </div>
-                </div>
-
-                {otpError && (
-                  <div className="p-3 text-xs bg-red-50 text-red-700 border border-red-200 rounded-xl font-medium">
-                    {otpError}
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-[#2C2B29]">Create Account Password</label>
+                  <label className="text-xs font-bold text-[#2C2B29]">Create Password</label>
                   <input
                     type="password"
                     placeholder="At least 4 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/30 text-[#2C2B29]"
+                    className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/40 text-[#2C2B29]"
                   />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-[#2C2B29]">Email Address (Optional)</label>
-                  <input
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/30 text-[#2C2B29]"
-                  />
+                <div className="flex flex-col gap-1.5 pt-1">
+                  <label className="text-xs font-bold text-[#2C2B29]">Send Verification OTP via</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOtpMethod('sms')}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        otpMethod === 'sms'
+                          ? 'border-[#3C5A48] bg-[#EBF1ED] text-[#3C5A48]'
+                          : 'border-[#E6E1DA] bg-white text-[#736F6A] hover:bg-[#FAF8F5]'
+                      }`}
+                    >
+                      <Phone className="w-3.5 h-3.5" /> SMS Mobile OTP
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOtpMethod('email')}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        otpMethod === 'email'
+                          ? 'border-[#3C5A48] bg-[#EBF1ED] text-[#3C5A48]'
+                          : 'border-[#E6E1DA] bg-white text-[#736F6A] hover:bg-[#FAF8F5]'
+                      }`}
+                    >
+                      <Mail className="w-3.5 h-3.5" /> Email OTP
+                    </button>
+                  </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 px-4 bg-[#3C5A48] hover:bg-[#2E4738] text-white font-semibold text-sm rounded-xl transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full mt-2 py-3 px-4 bg-[#3C5A48] hover:bg-[#2E4738] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+                  id="submit-register-btn"
                 >
-                  Complete Registration
+                  <span>Send OTP & Register</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
             )}
-          </div>
+          </>
         )}
 
-        {/* EMAIL LOGIN FORM */}
-        {authMethod === 'email' && (
-          <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3.5" id="email-login-form">
-            {isNewUser && (
-              <div className="flex flex-col gap-1.5" id="form-group-name">
-                <label htmlFor="name-input" className="text-xs font-bold text-[#2C2B29]">Full Name</label>
-                <input
-                  id="name-input"
-                  type="text"
-                  placeholder="Jane Doe"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required={isNewUser}
-                  className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/30 text-[#2C2B29]"
-                />
+        {/* STEP 2: OTP VERIFICATION MODAL / SCREEN */}
+        {step === 'otp' && (
+          <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4 animate-fadeIn" id="otp-form">
+            <div className="p-3 bg-[#EBF1ED] border border-[#3C5A48]/30 rounded-2xl flex items-start gap-2.5">
+              <ShieldCheck className="w-5 h-5 text-[#3C5A48] flex-shrink-0 mt-0.5" />
+              <div className="text-xs">
+                <p className="font-bold text-[#2C2B29]">Verify Your Account</p>
+                <p className="text-[#3C5A48] font-semibold mt-0.5 leading-relaxed">{otpNotice}</p>
+                <button
+                  type="button"
+                  onClick={() => setEnteredOtp(generatedOtp)}
+                  className="mt-1 text-[11px] font-bold text-[#2E7D52] underline cursor-pointer hover:text-[#2E4738]"
+                >
+                  Click to Auto-Fill Test OTP ({generatedOtp})
+                </button>
               </div>
-            )}
+            </div>
 
-            <div className="flex flex-col gap-1.5" id="form-group-email">
-              <label htmlFor="email-input" className="text-xs font-bold text-[#2C2B29]">Email Address</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-[#2C2B29]">Enter 6-Digit Verification Code</label>
               <input
-                id="email-input"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                maxLength={6}
+                placeholder="123456"
+                value={enteredOtp}
+                onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
                 required
-                className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/30 text-[#2C2B29]"
+                className="px-3.5 py-3 border border-[#E6E1DA] rounded-xl text-center tracking-widest text-xl font-mono font-extrabold focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-white text-[#2C2B29]"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full mt-1 py-2.5 px-4 bg-[#3C5A48] hover:bg-[#2E4738] text-white font-semibold text-sm rounded-xl transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-              id="login-submit-btn"
+              className="w-full py-3 px-4 bg-[#3C5A48] hover:bg-[#2E4738] text-white font-bold text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
             >
-              {isNewUser ? 'Create Account' : 'Sign In with Email'}
-              <ArrowRight className="w-4 h-4" />
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Verify & Complete Registration</span>
             </button>
+
+            <div className="flex items-center justify-between text-xs text-[#736F6A] pt-1">
+              <button
+                type="button"
+                onClick={() => setStep('form')}
+                className="hover:text-[#2C2B29] underline"
+              >
+                Back to Edit Info
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const code = Math.floor(100000 + Math.random() * 900000).toString();
+                  setGeneratedOtp(code);
+                  setOtpNotice(`Resent new code. Demo OTP: ${code}`);
+                }}
+                className="text-[#3C5A48] font-bold flex items-center gap-1 hover:underline"
+              >
+                <RefreshCw className="w-3 h-3" /> Resend Code
+              </button>
+            </div>
           </form>
         )}
 
-        {/* Form Toggle (New User vs Log In) */}
-        <div className="text-center pt-2 border-t border-[#E6E1DA]" id="form-toggle-section">
-          <button
-            type="button"
-            onClick={() => {
-              setIsNewUser(!isNewUser);
-              setPhoneStep('input');
-              setLoginError('');
-              setOtpError('');
-            }}
-            className="text-xs font-semibold text-[#3C5A48] hover:text-[#2E4738] transition-colors focus:outline-none cursor-pointer"
-            id="toggle-auth-btn"
-          >
-            {isNewUser ? 'Already registered? Log in here' : 'New user? Register with Mobile & OTP'}
-          </button>
+        {/* BOTTOM SECTION: Compact Demo Accounts for quick testing */}
+        <div className="pt-4 border-t border-[#E6E1DA] flex flex-col gap-2.5" id="demo-accounts-bottom">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-[#736F6A] uppercase tracking-wider">
+              Try Demo Account (Instant Test)
+            </span>
+            <span className="text-[10px] text-[#3C5A48] font-bold flex items-center gap-1">
+              <Sparkles className="w-3 h-3" /> 1-Click
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {DEMO_USERS.slice(0, 2).map((user) => (
+              <button
+                key={user.id}
+                type="button"
+                onClick={() => onLogin(user)}
+                className="flex items-center gap-2.5 p-2.5 border border-[#E6E1DA] rounded-xl hover:border-[#3C5A48] hover:bg-[#EBF1ED]/40 transition-all text-left group cursor-pointer bg-[#FAF8F5]/30"
+                id={`demo-user-btn-${user.id}`}
+              >
+                <img
+                  src={user.avatar}
+                  alt={user.name}
+                  className="w-7 h-7 rounded-full object-cover border border-[#E6E1DA]"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="min-w-0">
+                  <h4 className="text-xs font-bold text-[#2C2B29] truncate">{user.name}</h4>
+                  <p className="text-[10px] text-[#736F6A] truncate">Demo User</p>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
+
       </div>
     </div>
   );
