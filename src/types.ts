@@ -8,7 +8,6 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
-  password?: string;
   avatar?: string;
   friendIds?: string[];
 }
@@ -31,6 +30,8 @@ export interface Split {
   percentage?: number; // Optional for tracking details
 }
 
+export type ExpenseCategory = 'food' | 'groceries' | 'rent' | 'transport' | 'utilities' | 'entertainment' | 'other';
+
 export interface Expense {
   id: string;
   description: string;
@@ -40,6 +41,7 @@ export interface Expense {
   groupId: string | null; // null means individual/non-group expense
   splits: Split[];
   splitMethod: SplitMethod;
+  category?: ExpenseCategory;
   isSettlement: boolean; // True if this is a settle-up transaction
   createdBy: string; // User ID who created it
   createdAt: string;

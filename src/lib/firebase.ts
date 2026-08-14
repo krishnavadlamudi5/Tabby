@@ -9,12 +9,26 @@ import {
   getDocs,
   writeBatch,
 } from 'firebase/firestore';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  User as FirebaseUser,
+} from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { User, Group, Expense, Activity } from '../types';
 import { DEMO_USERS, DEMO_GROUPS, DEMO_EXPENSES, DEMO_ACTIVITIES } from '../data/demoData';
 
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+// Initialize Auth
+export const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
 
 // Initialize Firestore with custom database ID if present
 export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== ''
@@ -132,6 +146,14 @@ export async function saveExpenseToFirestore(expense: Expense) {
   }
 }
 
+export async function updateExpenseInFirestore(expense: Expense) {
+  try {
+    await setDoc(doc(expensesCol, expense.id), expense, { merge: true });
+  } catch (e) {
+    console.error('Error updating expense in Firestore:', e);
+  }
+}
+
 export async function deleteExpenseFromFirestore(expenseId: string) {
   try {
     await deleteDoc(doc(expensesCol, expenseId));
@@ -146,4 +168,56 @@ export async function saveActivityToFirestore(activity: Activity) {
   } catch (e) {
     console.error('Error saving activity to Firestore:', e);
   }
+}
+
+// Authentication Functions
+export async function signInWithGoogle(): Promise<User> {
+  const result = await signInWithPopup(auth, googleProvider);
+  const fbUser = result.user;
+  const user: User = {
+    id: fbUser.uid,
+    name: fbUser.displayName || 'Google User',
+    email: fbUser.email || '',
+    avatar: fbUser.photoURL || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
+  };
+  await saveUserToFirestore(user);
+  return user;
+}
+
+export async function signInWithEmail(emailVal: string, passwordVal: string): Promise<User> {
+  const result = await signInWithEmailAndPassword(auth, emailVal, passwordVal);
+  const fbUser = result.user;
+  const user: User = {
+    id: fbUser.uid,
+    name: fbUser.displayName || emailVal.split('@')[0],
+    email: fbUser.email || emailVal,
+    avatar: fbUser.photoURL || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
+  };
+  return user;
+}
+
+export async function registerWithEmail(nameVal: string, emailVal: string, phoneVal: string, passwordVal: string): Promise<User> {
+  const result = await createUserWithEmailAndPassword(auth, emailVal, passwordVal);
+  const fbUser = result.user;
+  const user: User = {
+    id: fbUser.uid,
+    name: nameVal,
+    email: emailVal,
+    phone: phoneVal,
+    avatar: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
+  };
+  await saveUserToFirestore(user);
+  return user;
+}
+
+export async function signOutUser() {
+  try {
+    await signOut(auth);
+  } catch (e) {
+    console.error('Error signing out:', e);
+  }
+}
+
+export function subscribeAuth(callback: (fbUser: FirebaseUser | null) => void) {
+  return onAuthStateChanged(auth, callback);
 }

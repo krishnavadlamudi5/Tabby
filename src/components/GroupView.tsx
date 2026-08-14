@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   Trash2,
+  Edit2,
   CheckCircle,
   Info,
   DollarSign,
@@ -47,6 +48,7 @@ interface GroupViewProps {
   allUsers: User[];
   currency?: string;
   onAddExpenseClick: (groupId: string) => void;
+  onEditExpense?: (expense: Expense) => void;
   onDeleteExpense: (expenseId: string) => void;
   onSettleDebt: (fromUserId: string, toUserId: string, amount: number, groupId: string | null) => void;
 }
@@ -58,6 +60,7 @@ export default function GroupView({
   allUsers,
   currency = 'USD',
   onAddExpenseClick,
+  onEditExpense,
   onDeleteExpense,
   onSettleDebt,
 }: GroupViewProps) {
@@ -140,59 +143,72 @@ export default function GroupView({
     const categories: Record<string, number> = {};
 
     groupExpenses.forEach((e) => {
-      const desc = (e.description || '').toLowerCase();
       let cat = 'General';
-      if (
-        desc.includes('din') ||
-        desc.includes('food') ||
-        desc.includes('rest') ||
-        desc.includes('lunch') ||
-        desc.includes('meal') ||
-        desc.includes('cafe') ||
-        desc.includes('coffee') ||
-        desc.includes('🍔')
-      ) {
-        cat = 'Food & Dining';
-      } else if (
-        desc.includes('grocer') ||
-        desc.includes('supermarket') ||
-        desc.includes('mart') ||
-        desc.includes('🛒')
-      ) {
-        cat = 'Groceries';
-      } else if (
-        desc.includes('rent') ||
-        desc.includes('stay') ||
-        desc.includes('hotel') ||
-        desc.includes('airbnb') ||
-        desc.includes('🏠')
-      ) {
-        cat = 'Rent & Stay';
-      } else if (
-        desc.includes('taxi') ||
-        desc.includes('cab') ||
-        desc.includes('uber') ||
-        desc.includes('flight') ||
-        desc.includes('bus') ||
-        desc.includes('fuel') ||
-        desc.includes('🚕')
-      ) {
-        cat = 'Transportation';
-      } else if (
-        desc.includes('util') ||
-        desc.includes('electric') ||
-        desc.includes('water') ||
-        desc.includes('wifi') ||
-        desc.includes('⚡')
-      ) {
-        cat = 'Utilities';
-      } else if (
-        desc.includes('movi') ||
-        desc.includes('ticket') ||
-        desc.includes('concert') ||
-        desc.includes('🎬')
-      ) {
-        cat = 'Entertainment';
+      if (e.category) {
+        const catMap: Record<string, string> = {
+          food: 'Food & Dining',
+          groceries: 'Groceries',
+          rent: 'Rent & Stay',
+          transport: 'Transportation',
+          utilities: 'Utilities',
+          entertainment: 'Entertainment',
+          other: 'General',
+        };
+        cat = catMap[e.category] || 'General';
+      } else {
+        const desc = (e.description || '').toLowerCase();
+        if (
+          desc.includes('din') ||
+          desc.includes('food') ||
+          desc.includes('rest') ||
+          desc.includes('lunch') ||
+          desc.includes('meal') ||
+          desc.includes('cafe') ||
+          desc.includes('coffee') ||
+          desc.includes('🍔')
+        ) {
+          cat = 'Food & Dining';
+        } else if (
+          desc.includes('grocer') ||
+          desc.includes('supermarket') ||
+          desc.includes('mart') ||
+          desc.includes('🛒')
+        ) {
+          cat = 'Groceries';
+        } else if (
+          desc.includes('rent') ||
+          desc.includes('stay') ||
+          desc.includes('hotel') ||
+          desc.includes('airbnb') ||
+          desc.includes('🏠')
+        ) {
+          cat = 'Rent & Stay';
+        } else if (
+          desc.includes('taxi') ||
+          desc.includes('cab') ||
+          desc.includes('uber') ||
+          desc.includes('flight') ||
+          desc.includes('bus') ||
+          desc.includes('fuel') ||
+          desc.includes('🚕')
+        ) {
+          cat = 'Transportation';
+        } else if (
+          desc.includes('util') ||
+          desc.includes('electric') ||
+          desc.includes('water') ||
+          desc.includes('wifi') ||
+          desc.includes('⚡')
+        ) {
+          cat = 'Utilities';
+        } else if (
+          desc.includes('movi') ||
+          desc.includes('ticket') ||
+          desc.includes('concert') ||
+          desc.includes('🎬')
+        ) {
+          cat = 'Entertainment';
+        }
       }
 
       categories[cat] = (categories[cat] || 0) + e.amount;
@@ -542,13 +558,23 @@ export default function GroupView({
                           <span className="text-[10px] text-[#736F6A] font-medium">
                             Added {new Date(tx.createdAt).toLocaleDateString()}
                           </span>
+                          {onEditExpense && (
+                            <button
+                              onClick={() => onEditExpense(tx)}
+                              className="p-1.5 rounded-lg border border-[#E6E1DA] text-[#3C5A48] hover:bg-[#EBF1ED] hover:border-[#3C5A48]/30 transition-all flex items-center justify-center gap-1 font-semibold text-[11px] bg-white cursor-pointer"
+                              type="button"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                              Edit
+                            </button>
+                          )}
                           <button
                             onClick={() => onDeleteExpense(tx.id)}
                             className="p-1.5 rounded-lg border border-[#E6E1DA] text-[#736F6A] hover:text-[#C86D51] hover:bg-[#FDF3F0] hover:border-[#C86D51]/30 transition-all flex items-center justify-center gap-1 font-semibold text-[11px] bg-white cursor-pointer"
                             type="button"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            Delete Expense
+                            Delete
                           </button>
                         </div>
                       </div>

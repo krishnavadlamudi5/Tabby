@@ -4,18 +4,20 @@
  */
 
 import React, { useState } from 'react';
-import { User, Expense } from '../types';
+import { User, Expense, Group } from '../types';
 import { calculateNetBalances, simplifyDebts } from '../utils/debtSimplifier';
 import { formatAmount } from '../utils/currency';
-import { Plus, UserCheck, ArrowRight, Trash2, CheckCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, UserCheck, ArrowRight, Trash2, Edit2, CheckCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface FriendViewProps {
   friend: User;
   expenses: Expense[];
+  groups?: Group[];
   currentUser: User;
   allUsers: User[];
   currency?: string;
   onAddExpenseClick: (groupId: string | null, friendId: string) => void;
+  onEditExpense?: (expense: Expense) => void;
   onDeleteExpense: (expenseId: string) => void;
   onSettleDebt: (fromUserId: string, toUserId: string, amount: number, groupId: string | null) => void;
 }
@@ -23,10 +25,12 @@ interface FriendViewProps {
 export default function FriendView({
   friend,
   expenses,
+  groups = [],
   currentUser,
   allUsers,
   currency = 'USD',
   onAddExpenseClick,
+  onEditExpense,
   onDeleteExpense,
   onSettleDebt,
 }: FriendViewProps) {
@@ -255,7 +259,7 @@ export default function FriendView({
                         <div className="min-w-0 flex-1">
                           <h4 className="text-sm font-bold text-[#2C2B29] truncate">{tx.description}</h4>
                           <p className="text-xs text-[#736F6A] mt-0.5 truncate">
-                            {tx.groupId ? `In group "${tx.id.startsWith('exp-') && tx.groupId ? 'Apartment 4B' : 'Group'}"` : 'Individual Split'} • Paid by {isPaidByMe ? 'You' : paidUser?.name}
+                            {tx.groupId ? `In group "${groups.find((g) => g.id === tx.groupId)?.name || 'Group'}"` : 'Individual Split'} • Paid by {isPaidByMe ? 'You' : paidUser?.name}
                           </p>
                         </div>
                       </div>
@@ -309,13 +313,23 @@ export default function FriendView({
                           <span className="text-[10px] text-[#736F6A] font-medium">
                             Added {new Date(tx.createdAt).toLocaleDateString()}
                           </span>
+                          {onEditExpense && (
+                            <button
+                              onClick={() => onEditExpense(tx)}
+                              className="p-1.5 rounded-lg border border-[#E6E1DA] text-[#3C5A48] hover:bg-[#EBF1ED] hover:border-[#3C5A48]/30 transition-all flex items-center justify-center gap-1 font-semibold text-[11px] bg-white cursor-pointer"
+                              type="button"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                              Edit
+                            </button>
+                          )}
                           <button
                             onClick={() => onDeleteExpense(tx.id)}
                             className="p-1.5 rounded-lg border border-[#E6E1DA] text-[#736F6A] hover:text-[#C86D51] hover:bg-[#FDF3F0] hover:border-[#C86D51]/30 transition-all flex items-center justify-center gap-1 font-semibold text-[11px] bg-white cursor-pointer"
                             type="button"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            Delete Expense
+                            Delete
                           </button>
                         </div>
                       </div>

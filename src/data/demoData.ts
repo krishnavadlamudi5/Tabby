@@ -65,6 +65,7 @@ export const DEMO_EXPENSES: Expense[] = [
     paidBy: 'user-alex', // Alex paid
     groupId: 'group-apt',
     splitMethod: 'equally',
+    category: 'rent',
     isSettlement: false,
     createdBy: 'user-alex',
     createdAt: '2026-08-01T12:05:00Z',
@@ -82,6 +83,7 @@ export const DEMO_EXPENSES: Expense[] = [
     paidBy: 'user-sarah', // Sarah paid
     groupId: 'group-apt',
     splitMethod: 'equally',
+    category: 'utilities',
     isSettlement: false,
     createdBy: 'user-sarah',
     createdAt: '2026-08-03T15:40:00Z',
@@ -99,6 +101,7 @@ export const DEMO_EXPENSES: Expense[] = [
     paidBy: 'user-david', // David paid
     groupId: 'group-apt',
     splitMethod: 'equally',
+    category: 'groceries',
     isSettlement: false,
     createdBy: 'user-david',
     createdAt: '2026-08-04T18:12:00Z',
@@ -118,6 +121,7 @@ export const DEMO_EXPENSES: Expense[] = [
     paidBy: 'user-alex', // Alex paid
     groupId: 'group-trip',
     splitMethod: 'equally',
+    category: 'rent',
     isSettlement: false,
     createdBy: 'user-alex',
     createdAt: '2026-08-05T10:00:00Z',
@@ -136,6 +140,7 @@ export const DEMO_EXPENSES: Expense[] = [
     paidBy: 'user-emily', // Emily paid
     groupId: 'group-trip',
     splitMethod: 'equally',
+    category: 'food',
     isSettlement: false,
     createdBy: 'user-emily',
     createdAt: '2026-08-06T14:30:00Z',
@@ -154,6 +159,7 @@ export const DEMO_EXPENSES: Expense[] = [
     paidBy: 'user-ryan', // Ryan paid
     groupId: 'group-trip',
     splitMethod: 'equally',
+    category: 'transport',
     isSettlement: false,
     createdBy: 'user-ryan',
     createdAt: '2026-08-07T11:15:00Z',
@@ -174,6 +180,7 @@ export const DEMO_EXPENSES: Expense[] = [
     paidBy: 'user-alex', // Alex paid
     groupId: null, // Non-group
     splitMethod: 'equally',
+    category: 'entertainment',
     isSettlement: false,
     createdBy: 'user-alex',
     createdAt: '2026-08-08T22:30:00Z',

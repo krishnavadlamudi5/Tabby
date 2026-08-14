@@ -4,9 +4,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { User, Group, Expense, Split, SplitMethod } from '../types';
-import { getCurrencyConfig } from '../utils/currency';
-import { X, Calendar, DollarSign, FileText, Users, ChevronDown, Check, AlertCircle } from 'lucide-react';
+import { User, Group, Expense, Split, SplitMethod, ExpenseCategory } from '../types';
+import { getCurrencyConfig, formatAmount } from '../utils/currency';
+import { X, Calendar, DollarSign, FileText, Users, ChevronDown, Check, AlertCircle, Tag, Edit3 } from 'lucide-react';
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -16,7 +16,9 @@ interface ExpenseModalProps {
   groups: Group[];
   allUsers: User[]; // Map of all user details
   currency?: string;
-  onAddExpense: (expense: Omit<Expense, 'id' | 'createdBy' | 'createdAt'>) => void;
+  onAddExpense?: (expense: Omit<Expense, 'id' | 'createdBy' | 'createdAt'>) => void;
+  onSaveExpense?: (expense: Omit<Expense, 'id' | 'createdBy' | 'createdAt'> | Expense) => void;
+  existingExpense?: Expense | null;
   initialGroupId?: string | null;
   initialFriendId?: string | null;
 }
@@ -30,10 +32,14 @@ export default function ExpenseModal({
   allUsers,
   currency = 'USD',
   onAddExpense,
+  onSaveExpense,
+  existingExpense = null,
   initialGroupId = null,
   initialFriendId = null,
 }: ExpenseModalProps) {
   const currencyConfig = getCurrencyConfig(currency);
+  const isEditing = !!existingExpense;
+
   // Form States
   const [description, setDescription] = useState('');
   const [amountStr, setAmountStr] = useState('');
@@ -42,6 +48,7 @@ export default function ExpenseModal({
   const [friendId, setFriendId] = useState<string | 'none'>(initialFriendId || 'none');
   const [paidBy, setPaidBy] = useState<string>(currentUser.id);
   const [splitMethod, setSplitMethod] = useState<SplitMethod>('equally');
+  const [category, setCategory] = useState<ExpenseCategory>('other');
 
   // List of candidate users for splitting based on Group vs. Individual
   const [eligibleUsers, setEligibleUsers] = useState<User[]>([]);
@@ -75,19 +82,44 @@ export default function ExpenseModal({
     }
   }, [groupId, friendId, groups, friends, currentUser, allUsers]);
 
-  // Handle setting initial group or friend on modal open
+  // Handle setting initial group, friend, or existing expense data on modal open
   useEffect(() => {
     if (isOpen) {
-      setGroupId(initialGroupId || 'none');
-      setFriendId(initialFriendId || 'none');
-      setDescription('');
-      setAmountStr('');
-      setPaidBy(currentUser.id);
-      setSplitMethod('equally');
-      setDate(new Date().toISOString().split('T')[0]);
+      if (existingExpense) {
+        setDescription(existingExpense.description);
+        setAmountStr(existingExpense.amount.toString());
+        setDate(existingExpense.date || new Date().toISOString().split('T')[0]);
+        setGroupId(existingExpense.groupId || 'none');
+        setPaidBy(existingExpense.paidBy);
+        setSplitMethod(existingExpense.splitMethod);
+        setCategory(existingExpense.category || 'other');
+        
+        // Populate splits & included user IDs
+        const splitsUserIds = existingExpense.splits.map((s) => s.userId);
+        setIncludedUserIds(splitsUserIds);
+        
+        if (existingExpense.splitMethod === 'exactly' || existingExpense.splitMethod === 'percentage') {
+          const inputs: Record<string, string> = {};
+          existingExpense.splits.forEach((s) => {
+            inputs[s.userId] = existingExpense.splitMethod === 'percentage'
+              ? (s.percentage?.toString() || '')
+              : s.amount.toString();
+          });
+          setCustomInputs(inputs);
+        }
+      } else {
+        setGroupId(initialGroupId || 'none');
+        setFriendId(initialFriendId || 'none');
+        setDescription('');
+        setAmountStr('');
+        setPaidBy(currentUser.id);
+        setSplitMethod('equally');
+        setCategory('other');
+        setDate(new Date().toISOString().split('T')[0]);
+      }
       setValidationError(null);
     }
-  }, [isOpen, initialGroupId, initialFriendId, currentUser.id]);
+  }, [isOpen, initialGroupId, initialFriendId, currentUser.id, existingExpense]);
 
   // Reset custom inputs when splitMethod or eligibleUsers changes
   useEffect(() => {
@@ -194,7 +226,8 @@ export default function ExpenseModal({
     }
 
     // Finalize split distribution
-    onAddExpense({
+    const expensePayload = {
+      ...(existingExpense ? { id: existingExpense.id, createdBy: existingExpense.createdBy, createdAt: existingExpense.createdAt } : {}),
       description: description.trim() || 'General Expense',
       amount: totalAmount,
       date,
@@ -202,8 +235,15 @@ export default function ExpenseModal({
       groupId: groupId === 'none' ? null : groupId,
       splits: computedSplits.filter((s) => s.amount > 0),
       splitMethod,
+      category,
       isSettlement: false,
-    });
+    };
+
+    if (onSaveExpense) {
+      onSaveExpense(expensePayload as any);
+    } else if (onAddExpense) {
+      onAddExpense(expensePayload as any);
+    }
 
     onClose();
   };
@@ -218,9 +258,9 @@ export default function ExpenseModal({
         <div className="flex items-center justify-between p-5 border-b border-[#E6E1DA]" id="expense-modal-header">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-[#3C5A48] flex items-center justify-center text-white" id="header-icon-container">
-              <Users className="w-4 h-4" />
+              {isEditing ? <Edit3 className="w-4 h-4" /> : <Users className="w-4 h-4" />}
             </div>
-            <h2 className="text-lg font-bold text-[#2C2B29]">Add an Expense</h2>
+            <h2 className="text-lg font-bold text-[#2C2B29]">{isEditing ? 'Edit Expense' : 'Add an Expense'}</h2>
           </div>
 
           <div className="flex items-center gap-2" id="header-action-group">
@@ -232,7 +272,7 @@ export default function ExpenseModal({
               title="Save Expense Now"
             >
               <Check className="w-4 h-4 stroke-[3]" />
-              <span>Save</span>
+              <span>{isEditing ? 'Update' : 'Save'}</span>
             </button>
             <button
               onClick={onClose}
@@ -247,6 +287,27 @@ export default function ExpenseModal({
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
+          {/* Category Dropdown & Presets */}
+          <div className="flex flex-col gap-1.5" id="category-selector-container">
+            <label htmlFor="expense-category" className="text-xs font-bold text-[#2C2B29] flex items-center gap-1">
+              <Tag className="w-3.5 h-3.5 text-[#3C5A48]" /> Category
+            </label>
+            <select
+              id="expense-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
+              className="w-full px-3 py-2 border border-[#E6E1DA] rounded-xl text-xs bg-white text-[#2C2B29] focus:outline-none focus:border-[#3C5A48]"
+            >
+              <option value="food">🍔 Food & Dining</option>
+              <option value="groceries">🛒 Groceries</option>
+              <option value="rent">🏠 Rent & Stay</option>
+              <option value="transport">🚕 Transportation</option>
+              <option value="utilities">⚡ Utilities</option>
+              <option value="entertainment">🎬 Entertainment</option>
+              <option value="other">📦 Other / General</option>
+            </select>
+          </div>
+
           {/* Top Priority Inputs: Amount & Description */}
           <div className="flex flex-col gap-3.5 bg-[#FAF8F5] p-3.5 rounded-2xl border border-[#E6E1DA]" id="top-amount-desc-section">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
@@ -295,20 +356,33 @@ export default function ExpenseModal({
 
             {/* Quick Category Chips */}
             <div className="flex flex-wrap gap-1.5 pt-1" id="category-chips">
-              {['🍔 Dinner', '🛒 Groceries', '🏠 Rent', '🚕 Taxi', '☕ Coffee', '⚡ Utilities', '🎬 Movies'].map((cat) => (
+              {[
+                { label: '🍔 Dinner', cat: 'food' },
+                { label: '🛒 Groceries', cat: 'groceries' },
+                { label: '🏠 Rent', cat: 'rent' },
+                { label: '🚕 Taxi', cat: 'transport' },
+                { label: '☕ Coffee', cat: 'food' },
+                { label: '⚡ Utilities', cat: 'utilities' },
+                { label: '🎬 Movies', cat: 'entertainment' }
+              ].map((chip) => (
                 <button
-                  key={cat}
+                  key={chip.label}
                   type="button"
                   onClick={() => {
+                    setCategory(chip.cat as ExpenseCategory);
                     if (!description) {
-                      setDescription(cat);
-                    } else if (!description.includes(cat.split(' ')[1])) {
-                      setDescription(`${cat} - ${description}`);
+                      setDescription(chip.label);
+                    } else if (!description.includes(chip.label.split(' ')[1])) {
+                      setDescription(`${chip.label} - ${description}`);
                     }
                   }}
-                  className="px-2.5 py-1 bg-white border border-[#E6E1DA] hover:border-[#3C5A48] hover:bg-[#EBF1ED]/40 text-[11px] font-semibold text-[#2C2B29] rounded-lg transition-colors cursor-pointer"
+                  className={`px-2.5 py-1 border text-[11px] font-semibold rounded-lg transition-colors cursor-pointer ${
+                    category === chip.cat
+                      ? 'border-[#3C5A48] bg-[#EBF1ED] text-[#3C5A48]'
+                      : 'border-[#E6E1DA] bg-white hover:border-[#3C5A48] hover:bg-[#EBF1ED]/40 text-[#2C2B29]'
+                  }`}
                 >
-                  {cat}
+                  {chip.label}
                 </button>
               ))}
             </div>
@@ -532,7 +606,7 @@ export default function ExpenseModal({
 
                         <div className="text-right min-w-[70px]">
                           <span className="text-sm font-semibold text-[#2C2B29]">
-                            ${computedVal.toFixed(2)}
+                            {formatAmount(computedVal, currency)}
                           </span>
                           {splitMethod === 'percentage' && isIncluded && (
                             <div className="text-[10px] text-[#736F6A]">
@@ -557,9 +631,9 @@ export default function ExpenseModal({
                     {remaining === 0 ? (
                       '✓ Perfect balance'
                     ) : remaining > 0 ? (
-                      `$${remaining.toFixed(2)} left to assign`
+                      `${formatAmount(remaining, currency)} left to assign`
                     ) : (
-                      `Over-assigned by $${Math.abs(remaining).toFixed(2)}`
+                      `Over-assigned by ${formatAmount(Math.abs(remaining), currency)}`
                     )}
                   </span>
                 ) : (
@@ -575,7 +649,7 @@ export default function ExpenseModal({
                 )}
                 
                 <span className="text-[#736F6A] font-medium">
-                  Total: <strong className="text-[#2C2B29]">${totalAmount.toFixed(2)}</strong>
+                  Total: <strong className="text-[#2C2B29]">{formatAmount(totalAmount, currency)}</strong>
                 </span>
               </div>
             </div>

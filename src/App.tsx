@@ -26,8 +26,11 @@ import {
   saveUserToFirestore,
   saveGroupToFirestore,
   saveExpenseToFirestore,
+  updateExpenseInFirestore,
   deleteExpenseFromFirestore,
   saveActivityToFirestore,
+  signOutUser,
+  subscribeAuth,
 } from './lib/firebase';
 import { 
   Users, 
@@ -77,6 +80,7 @@ export default function App() {
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseModalGroupId, setExpenseModalGroupId] = useState<string | null>(null);
   const [expenseModalFriendId, setExpenseModalFriendId] = useState<string | null>(null);
+  const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
 
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
@@ -215,6 +219,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    signOutUser();
     setCurrentUser(null);
     localStorage.removeItem('splitwise_user');
     setActiveView({ type: 'dashboard' });
@@ -338,44 +343,87 @@ export default function App() {
     setIsMobileMenuOpen(false);
   };
 
-  const handleAddExpense = (expenseData: Omit<Expense, 'id' | 'createdBy' | 'createdAt'>) => {
+  const handleOpenEditExpense = (expense: Expense) => {
+    setExpenseToEdit(expense);
+    setExpenseModalGroupId(expense.groupId || null);
+    setExpenseModalFriendId(null);
+    setIsExpenseModalOpen(true);
+  };
+
+  const handleSaveExpense = (expenseData: Omit<Expense, 'id' | 'createdBy' | 'createdAt'> | Expense) => {
     if (!currentUser) return;
 
-    const newExpense: Expense = {
-      ...expenseData,
-      id: `exp-${Date.now()}`,
-      createdBy: currentUser.id,
-      createdAt: new Date().toISOString(),
-    };
+    if ('id' in expenseData && expenseData.id) {
+      // EDIT EXISTING EXPENSE
+      const updatedExpense = expenseData as Expense;
+      updateExpenseInFirestore(updatedExpense);
+      setExpenses((prev) => {
+        const updated = prev.map((e) => (e.id === updatedExpense.id ? updatedExpense : e));
+        localStorage.setItem('splitwise_expenses', JSON.stringify(updated));
+        return updated;
+      });
 
-    saveExpenseToFirestore(newExpense);
-    setExpenses((prev) => {
-      const updated = [...prev, newExpense];
-      localStorage.setItem('splitwise_expenses', JSON.stringify(updated));
-      return updated;
-    });
+      let scopeText = 'outside of any group';
+      if (updatedExpense.groupId) {
+        const grp = groups.find((g) => g.id === updatedExpense.groupId);
+        if (grp) scopeText = `in "${grp.name}"`;
+      }
 
-    // Generate descriptive log
-    let scopeText = 'outside of any group';
-    if (newExpense.groupId) {
-      const grp = groups.find((g) => g.id === newExpense.groupId);
-      if (grp) scopeText = `in "${grp.name}"`;
+      const editAct: Activity = {
+        id: `act-${Date.now()}`,
+        type: 'expense_add',
+        userId: currentUser.id,
+        description: `updated "${updatedExpense.description}" (${formatAmount(updatedExpense.amount, currency)}) ${scopeText}`,
+        timestamp: new Date().toISOString(),
+      };
+
+      saveActivityToFirestore(editAct);
+      setActivities((prev) => {
+        const updated = [editAct, ...prev];
+        localStorage.setItem('splitwise_activities', JSON.stringify(updated));
+        return updated;
+      });
+    } else {
+      // CREATE NEW EXPENSE
+      const newExpense: Expense = {
+        ...(expenseData as Omit<Expense, 'id' | 'createdBy' | 'createdAt'>),
+        id: `exp-${Date.now()}`,
+        createdBy: currentUser.id,
+        createdAt: new Date().toISOString(),
+      };
+
+      saveExpenseToFirestore(newExpense);
+      setExpenses((prev) => {
+        const updated = [...prev, newExpense];
+        localStorage.setItem('splitwise_expenses', JSON.stringify(updated));
+        return updated;
+      });
+
+      let scopeText = 'outside of any group';
+      if (newExpense.groupId) {
+        const grp = groups.find((g) => g.id === newExpense.groupId);
+        if (grp) scopeText = `in "${grp.name}"`;
+      }
+
+      const newAct: Activity = {
+        id: `act-${Date.now()}`,
+        type: 'expense_add',
+        userId: currentUser.id,
+        description: `added "${newExpense.description}" (${formatAmount(newExpense.amount, currency)}) ${scopeText}`,
+        timestamp: new Date().toISOString(),
+      };
+
+      saveActivityToFirestore(newAct);
+      setActivities((prev) => {
+        const updated = [newAct, ...prev];
+        localStorage.setItem('splitwise_activities', JSON.stringify(updated));
+        return updated;
+      });
     }
+  };
 
-    const newAct: Activity = {
-      id: `act-${Date.now()}`,
-      type: 'expense_add',
-      userId: currentUser.id,
-      description: `added "${newExpense.description}" (${formatAmount(newExpense.amount, currency)}) ${scopeText}`,
-      timestamp: new Date().toISOString(),
-    };
-
-    saveActivityToFirestore(newAct);
-    setActivities((prev) => {
-      const updated = [newAct, ...prev];
-      localStorage.setItem('splitwise_activities', JSON.stringify(updated));
-      return updated;
-    });
+  const handleAddExpense = (expenseData: Omit<Expense, 'id' | 'createdBy' | 'createdAt'>) => {
+    handleSaveExpense(expenseData);
   };
 
   const handleDeleteExpense = (expenseId: string) => {
@@ -624,6 +672,7 @@ export default function App() {
         {/* Quick Add Expense Trigger */}
         <button
           onClick={() => {
+            setExpenseToEdit(null);
             setExpenseModalGroupId(null);
             setExpenseModalFriendId(null);
             setIsExpenseModalOpen(true);
@@ -865,6 +914,7 @@ export default function App() {
           <div className="hidden lg:block pt-4 border-t border-[#E6E1DA]" id="desktop-quick-add">
             <button
               onClick={() => {
+                setExpenseToEdit(null);
                 setExpenseModalGroupId(null);
                 setExpenseModalFriendId(null);
                 setIsExpenseModalOpen(true);
@@ -911,10 +961,12 @@ export default function App() {
                 allUsers={users}
                 currency={currency}
                 onAddExpenseClick={(gid) => {
+                  setExpenseToEdit(null);
                   setExpenseModalGroupId(gid);
                   setExpenseModalFriendId(null);
                   setIsExpenseModalOpen(true);
                 }}
+                onEditExpense={handleOpenEditExpense}
                 onDeleteExpense={handleDeleteExpense}
                 onSettleDebt={(fromId, toId, amt, gid) => handleOpenSettleModal(fromId, toId, amt, gid)}
               />
@@ -924,14 +976,17 @@ export default function App() {
               <FriendView
                 friend={activeFriend}
                 expenses={myExpenses}
+                groups={myGroups}
                 currentUser={currentUser}
                 allUsers={users}
                 currency={currency}
                 onAddExpenseClick={(gid, fid) => {
+                  setExpenseToEdit(null);
                   setExpenseModalGroupId(null);
                   setExpenseModalFriendId(fid);
                   setIsExpenseModalOpen(true);
                 }}
+                onEditExpense={handleOpenEditExpense}
                 onDeleteExpense={handleDeleteExpense}
                 onSettleDebt={(fromId, toId, amt, gid) => handleOpenSettleModal(fromId, toId, amt, gid)}
               />
@@ -954,12 +1009,17 @@ export default function App() {
       {/* MODAL 1: Expense Creator Form Modal */}
       <ExpenseModal
         isOpen={isExpenseModalOpen}
-        onClose={() => setIsExpenseModalOpen(false)}
+        onClose={() => {
+          setIsExpenseModalOpen(false);
+          setExpenseToEdit(null);
+        }}
         currentUser={currentUser}
         friends={myFriends}
         groups={myGroups}
         allUsers={users}
         currency={currency}
+        existingExpense={expenseToEdit}
+        onSaveExpense={handleSaveExpense}
         onAddExpense={handleAddExpense}
         initialGroupId={expenseModalGroupId}
         initialFriendId={expenseModalFriendId}

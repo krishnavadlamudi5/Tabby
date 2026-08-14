@@ -7,7 +7,17 @@ import React from 'react';
 import { User, Expense, Debt, Activity } from '../types';
 import { calculateNetBalances, simplifyDebts } from '../utils/debtSimplifier';
 import { formatAmount } from '../utils/currency';
-import { TrendingDown, TrendingUp, DollarSign, Wallet, ArrowRight, UserCheck, Bell, MessageSquare, Clock } from 'lucide-react';
+import { TrendingDown, TrendingUp, DollarSign, Wallet, ArrowRight, UserCheck, Bell, MessageSquare, Clock, BarChart3 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as ReTooltip,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 
 interface DashboardViewProps {
   currentUser: User;
@@ -35,6 +45,39 @@ export default function DashboardView({
     });
     return map;
   }, [allUsers]);
+
+  // Monthly Spending Trends data (Last 6 Months)
+  const monthlyTrendsData = React.useMemo(() => {
+    const monthsMap: Record<string, { label: string; paid: number; share: number; timestamp: number }> = {};
+    
+    // Generate last 6 calendar months
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString(undefined, { month: 'short' });
+      monthsMap[key] = { label, paid: 0, share: 0, timestamp: d.getTime() };
+    }
+
+    expenses.forEach((e) => {
+      if (e.isSettlement) return;
+      const d = new Date(e.date || e.createdAt);
+      if (isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (monthsMap[key]) {
+        if (e.paidBy === currentUser.id) {
+          monthsMap[key].paid += e.amount;
+        }
+        const mySplit = e.splits.find((s) => s.userId === currentUser.id);
+        if (mySplit) {
+          monthsMap[key].share += mySplit.amount;
+        }
+      }
+    });
+
+    return Object.values(monthsMap).sort((a, b) => a.timestamp - b.timestamp);
+  }, [expenses, currentUser.id]);
 
   // Calculate global net balances and debts
   const { netBalances, globalDebts, totalYouOwe, totalYouAreOwed, netBalance } = React.useMemo(() => {
@@ -130,8 +173,45 @@ export default function DashboardView({
       {/* Main Two-Column Panel Area */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="dashboard-panels-container">
         
-        {/* Left Column: Balances / Debt breakdown (7/12 cols) */}
+        {/* Left Column: Monthly Trends & Balances (7/12 cols) */}
         <div className="lg:col-span-7 flex flex-col gap-5" id="dashboard-left-panel">
+
+          {/* Monthly Spending Trends Chart Card */}
+          <div className="bg-white border border-[#E6E1DA] rounded-2xl p-5 shadow-xs flex flex-col gap-3" id="monthly-spending-trends-card">
+            <div className="flex items-center justify-between border-b border-[#E6E1DA] pb-3">
+              <div>
+                <h3 className="font-bold text-[#2C2B29] text-base flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-[#3C5A48]" />
+                  Monthly Spending Trends
+                </h3>
+                <p className="text-xs text-[#736F6A]">Your total money paid vs your calculated split share</p>
+              </div>
+            </div>
+
+            <div className="h-56 w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyTrendsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E6E1DA" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#736F6A' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#736F6A' }} axisLine={false} tickLine={false} />
+                  <ReTooltip
+                    formatter={(val: number) => [formatAmount(val, currency), '']}
+                    contentStyle={{
+                      backgroundColor: '#2C2B29',
+                      borderRadius: '12px',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                  <Bar dataKey="paid" name="You Paid Out" fill="#3C5A48" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="share" name="Your Split Share" fill="#D9A05B" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
           <div className="bg-white border border-[#E6E1DA] rounded-2xl p-5 shadow-xs flex flex-col gap-4">
             <h2 className="text-base font-bold text-[#2C2B29] tracking-tight">Active Balances Breakdown</h2>
 
