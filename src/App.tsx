@@ -647,13 +647,14 @@ export default function App() {
       )}
 
       {/* Mobile Sticky Header Bar */}
-      <header className="lg:hidden sticky top-0 z-40 bg-[#FAF8F5] border-b border-[#E6E1DA] px-4 py-3 flex items-center justify-between shadow-xs" id="mobile-top-bar">
-        <div className="flex items-center gap-3">
+      <header className="lg:hidden sticky top-0 z-40 bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#E6E1DA] px-4 py-2.5 pt-safe flex items-center justify-between shadow-2xs" id="mobile-top-bar">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-1.5 rounded-lg text-[#736F6A] hover:bg-[#EBF1ED] hover:text-[#2C2B29] transition-colors"
+            className="p-2 rounded-xl text-[#736F6A] hover:bg-[#EBF1ED] hover:text-[#2C2B29] active:scale-95 transition-all cursor-pointer"
             type="button"
             id="mobile-menu-toggle-btn"
+            aria-label="Open Menu"
           >
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -664,33 +665,56 @@ export default function App() {
               setIsMobileMenuOpen(false);
             }}
             type="button"
+            className="flex items-center gap-1.5 cursor-pointer"
           >
             <AppLogo size="sm" />
           </button>
         </div>
 
-        {/* Quick Add Expense Trigger */}
-        <button
-          onClick={() => {
-            setExpenseToEdit(null);
-            setExpenseModalGroupId(null);
-            setExpenseModalFriendId(null);
-            setIsExpenseModalOpen(true);
-          }}
-          className="p-1.5 rounded-lg bg-[#EBF1ED] text-[#3C5A48] hover:bg-[#E2EAE4] font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
-          type="button"
-          id="quick-add-bill-mobile"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add Bill
-        </button>
+        {/* Right Header Actions on Mobile */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              setActiveView({ type: 'notifications' });
+              setIsMobileMenuOpen(false);
+            }}
+            className={`p-2 rounded-xl relative transition-all cursor-pointer ${
+              activeView.type === 'notifications'
+                ? 'bg-[#3C5A48] text-white'
+                : 'text-[#736F6A] hover:bg-[#EBF1ED] hover:text-[#3C5A48]'
+            }`}
+            title="Notifications"
+            type="button"
+            id="mobile-header-bell"
+          >
+            <Bell className="w-4 h-4" />
+            {activities.length > 0 && (
+              <span className="w-2 h-2 rounded-full bg-[#C86D51] absolute top-1.5 right-1.5 ring-2 ring-white" />
+            )}
+          </button>
+
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-1 rounded-full border border-[#E6E1DA] hover:ring-2 hover:ring-[#3C5A48]/30 transition-all cursor-pointer"
+            type="button"
+            title="Settings & Profile"
+            id="mobile-header-profile"
+          >
+            <img
+              src={currentUser.avatar}
+              alt={currentUser.name}
+              className="w-7 h-7 rounded-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 flex relative" id="layout-body-wrapper">
         
         {/* Navigation Sidebar Drawer (Pinned on Desktop, toggleable slide-out on Mobile) */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-[#E6E1DA] bg-[#FAF8F5] flex flex-col p-5 shadow-sm lg:shadow-none lg:static transition-transform duration-300 lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
+          className={`fixed inset-y-0 left-0 z-40 w-72 sm:w-80 lg:w-64 border-r border-[#E6E1DA] bg-[#FAF8F5] flex flex-col p-5 shadow-xl lg:shadow-none lg:static transition-transform duration-300 lg:translate-x-0 pt-safe pb-safe ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
           id="navigation-sidebar"
         >
           {/* Brand Logo & Title on Desktop */}
@@ -734,7 +758,10 @@ export default function App() {
                 )}
               </button>
               <button
-                onClick={() => setIsSettingsOpen(true)}
+                onClick={() => {
+                  setIsSettingsOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
                 className="p-1.5 rounded-lg text-[#736F6A] hover:text-[#3C5A48] hover:bg-[#EBF1ED] transition-colors cursor-pointer"
                 title="Settings & Preferences"
                 type="button"
@@ -755,7 +782,7 @@ export default function App() {
           </div>
 
           {/* Navigation Links Scroll Container */}
-          <nav className="flex-1 overflow-y-auto py-3 flex flex-col gap-4 pr-1" id="sidebar-nav">
+          <nav className="flex-1 overflow-y-auto py-3 flex flex-col gap-4 pr-1 no-scrollbar" id="sidebar-nav">
             
             {/* Core Views */}
             <div className="flex flex-col gap-1" id="core-views-nav">
@@ -823,7 +850,10 @@ export default function App() {
               <div className="flex items-center justify-between px-3" id="groups-section-header">
                 <span className="text-[10px] font-bold text-[#736F6A] uppercase tracking-wider">My Groups</span>
                 <button
-                  onClick={() => setIsCreateGroupOpen(true)}
+                  onClick={() => {
+                    setIsCreateGroupOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
                   className="p-1 rounded-md text-[#736F6A] hover:bg-[#EBF1ED] hover:text-[#3C5A48] transition-all cursor-pointer"
                   title="Create a New Group"
                   type="button"
@@ -866,7 +896,10 @@ export default function App() {
               <div className="flex items-center justify-between px-3" id="friends-section-header">
                 <span className="text-[10px] font-bold text-[#736F6A] uppercase tracking-wider">My Friends</span>
                 <button
-                  onClick={() => setIsAddFriendOpen(true)}
+                  onClick={() => {
+                    setIsAddFriendOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
                   className="p-1 rounded-md text-[#736F6A] hover:bg-[#EBF1ED] hover:text-[#3C5A48] transition-all cursor-pointer"
                   title="Add Friend"
                   type="button"
@@ -933,14 +966,14 @@ export default function App() {
         {isMobileMenuOpen && (
           <div
             onClick={() => setIsMobileMenuOpen(false)}
-            className="fixed inset-0 z-30 bg-[#2C2B29]/30 backdrop-blur-xs lg:hidden"
+            className="fixed inset-0 z-30 bg-[#2C2B29]/40 backdrop-blur-xs lg:hidden animate-fadeIn"
             id="mobile-drawer-backdrop"
           ></div>
         )}
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto px-4 py-6 md:p-8" id="main-content-panel">
-          <div className="w-full max-w-5xl mx-auto flex flex-col gap-6" id="view-surface-container">
+        {/* Main Content Area - with bottom padding for mobile navigation bar */}
+        <main className="flex-1 overflow-y-auto px-3.5 py-4 sm:px-6 sm:py-6 md:p-8 pb-24 lg:pb-8" id="main-content-panel">
+          <div className="w-full max-w-5xl mx-auto flex flex-col gap-5 sm:gap-6" id="view-surface-container">
             {activeView.type === 'dashboard' && (
               <DashboardView
                 currentUser={currentUser}
@@ -1006,6 +1039,126 @@ export default function App() {
         </main>
       </div>
 
+      {/* Mobile Fixed Bottom Navigation Bar */}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E6E1DA] px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.5rem)] shadow-lg flex items-center justify-around"
+        id="mobile-bottom-nav"
+      >
+        <button
+          onClick={() => {
+            setActiveView({ type: 'dashboard' });
+            setIsMobileMenuOpen(false);
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            activeView.type === 'dashboard'
+              ? 'text-[#3C5A48] font-bold'
+              : 'text-[#736F6A] hover:text-[#2C2B29]'
+          }`}
+          type="button"
+          id="mobile-nav-dashboard"
+        >
+          <div className={`p-1 rounded-lg ${activeView.type === 'dashboard' ? 'bg-[#EBF1ED]' : ''}`}>
+            <Grid className="w-5 h-5" />
+          </div>
+          <span className="text-[10px] tracking-tight">Dashboard</span>
+        </button>
+
+        <button
+          onClick={() => {
+            if (activeView.type === 'group') {
+              setIsMobileMenuOpen(true);
+            } else if (myGroups.length > 0) {
+              setActiveView({ type: 'group', id: myGroups[0].id });
+            } else {
+              setIsCreateGroupOpen(true);
+            }
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            activeView.type === 'group'
+              ? 'text-[#3C5A48] font-bold'
+              : 'text-[#736F6A] hover:text-[#2C2B29]'
+          }`}
+          type="button"
+          id="mobile-nav-groups"
+        >
+          <div className={`p-1 rounded-lg relative ${activeView.type === 'group' ? 'bg-[#EBF1ED]' : ''}`}>
+            <Users className="w-5 h-5" />
+            {myGroups.length > 0 && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[#3C5A48] absolute top-1 right-1" />
+            )}
+          </div>
+          <span className="text-[10px] tracking-tight">Groups</span>
+        </button>
+
+        {/* Big Central Elevated Add Button */}
+        <div className="-mt-6 flex flex-col items-center">
+          <button
+            onClick={() => {
+              setExpenseToEdit(null);
+              setExpenseModalGroupId(activeView.type === 'group' ? activeView.id : null);
+              setExpenseModalFriendId(activeView.type === 'friend' ? activeView.id : null);
+              setIsExpenseModalOpen(true);
+            }}
+            className="w-12 h-12 rounded-full bg-[#3C5A48] hover:bg-[#2E4738] active:scale-95 text-white flex items-center justify-center shadow-lg border-2 border-white transition-all cursor-pointer"
+            type="button"
+            id="mobile-nav-add-btn"
+            title="Add Expense"
+          >
+            <Plus className="w-6 h-6 stroke-[3]" />
+          </button>
+          <span className="text-[10px] font-bold text-[#3C5A48] mt-0.5">Add</span>
+        </div>
+
+        <button
+          onClick={() => {
+            if (activeView.type === 'friend') {
+              setIsMobileMenuOpen(true);
+            } else if (myFriends.length > 0) {
+              setActiveView({ type: 'friend', id: myFriends[0].id });
+            } else {
+              setIsAddFriendOpen(true);
+            }
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            activeView.type === 'friend'
+              ? 'text-[#3C5A48] font-bold'
+              : 'text-[#736F6A] hover:text-[#2C2B29]'
+          }`}
+          type="button"
+          id="mobile-nav-friends"
+        >
+          <div className={`p-1 rounded-lg relative ${activeView.type === 'friend' ? 'bg-[#EBF1ED]' : ''}`}>
+            <UserPlus className="w-5 h-5" />
+            {myFriends.length > 0 && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[#3C5A48] absolute top-1 right-1" />
+            )}
+          </div>
+          <span className="text-[10px] tracking-tight">Friends</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveView({ type: 'notifications' });
+            setIsMobileMenuOpen(false);
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+            activeView.type === 'notifications'
+              ? 'text-[#3C5A48] font-bold'
+              : 'text-[#736F6A] hover:text-[#2C2B29]'
+          }`}
+          type="button"
+          id="mobile-nav-activity"
+        >
+          <div className={`p-1 rounded-lg relative ${activeView.type === 'notifications' ? 'bg-[#3C5A48] text-white' : ''}`}>
+            <Bell className="w-5 h-5" />
+            {activities.length > 0 && (
+              <span className="w-2 h-2 rounded-full bg-[#C86D51] absolute top-0.5 right-0.5 ring-2 ring-white" />
+            )}
+          </div>
+          <span className="text-[10px] tracking-tight">Activity</span>
+        </button>
+      </nav>
+
       {/* MODAL 1: Expense Creator Form Modal */}
       <ExpenseModal
         isOpen={isExpenseModalOpen}
@@ -1025,11 +1178,16 @@ export default function App() {
         initialFriendId={expenseModalFriendId}
       />
 
-      {/* MODAL 2: Create Group Modal */}
+      {/* MODAL 2: Create Group Modal (Responsive Bottom Sheet on Mobile) */}
       {isCreateGroupOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2C2B29]/40 backdrop-blur-xs" id="create-group-backdrop">
-          <div className="bg-white rounded-2xl border border-[#E6E1DA] shadow-xl max-w-md w-full flex flex-col" id="create-group-modal">
-            <div className="flex items-center justify-between p-5 border-b border-[#E6E1DA]" id="create-group-header">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#2C2B29]/40 backdrop-blur-xs animate-fadeIn" id="create-group-backdrop">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl border border-[#E6E1DA] shadow-xl max-w-md w-full flex flex-col max-h-[92vh] animate-sheet-up sm:animate-none overflow-hidden" id="create-group-modal">
+            {/* Mobile Drag Indicator */}
+            <div className="sm:hidden pt-3 pb-1 flex justify-center">
+              <div className="w-10 h-1 rounded-full bg-[#E6E1DA]" />
+            </div>
+
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#E6E1DA]" id="create-group-header">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-[#3C5A48] flex items-center justify-center text-white">
                   <Users className="w-4 h-4" />
@@ -1041,14 +1199,14 @@ export default function App() {
                   setIsCreateGroupOpen(false);
                   setGroupValidationError(null);
                 }}
-                className="p-1 rounded-lg text-[#736F6A] hover:bg-[#F8F5F2] hover:text-[#2C2B29] transition-colors"
+                className="p-1 rounded-lg text-[#736F6A] hover:bg-[#F8F5F2] hover:text-[#2C2B29] transition-colors cursor-pointer"
                 type="button"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateGroup} noValidate className="p-5 flex flex-col gap-4">
+            <form onSubmit={handleCreateGroup} noValidate className="p-4 sm:p-5 flex flex-col gap-4 overflow-y-auto">
               {/* Validation Feedback Banner */}
               {groupValidationError && (
                 <div className="p-3 bg-[#FDF3F0] border border-[#C86D51]/40 rounded-xl text-xs text-[#C86D51] font-semibold flex items-start gap-2.5 shadow-2xs animate-fadeIn" id="group-validation-error-banner">
@@ -1078,7 +1236,7 @@ export default function App() {
                     setNewGroupName(e.target.value);
                     if (groupValidationError) setGroupValidationError(null);
                   }}
-                  className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none transition-colors text-[#2C2B29] ${
+                  className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none transition-colors text-[#2C2B29] ${
                     groupValidationError && !newGroupName.trim()
                       ? 'border-[#C86D51] bg-[#FDF3F0]/40 focus:ring-1 focus:ring-[#C86D51]'
                       : 'border-[#E6E1DA] bg-[#FAF8F5]/30 focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48]'
@@ -1093,7 +1251,7 @@ export default function App() {
                   id="new-group-category"
                   value={newGroupCategory}
                   onChange={(e) => setNewGroupCategory(e.target.value as GroupCategory)}
-                  className="w-full px-3 py-2 border border-[#E6E1DA] rounded-xl text-sm bg-white focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] transition-colors text-[#2C2B29]"
+                  className="w-full px-3 py-2.5 border border-[#E6E1DA] rounded-xl text-sm bg-white focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] transition-colors text-[#2C2B29]"
                 >
                   <option value="trip">Trip / Vacation</option>
                   <option value="home">Apartment / House</option>
@@ -1112,7 +1270,7 @@ export default function App() {
                   </span>
                 </div>
 
-                <div className={`border rounded-xl bg-[#F8F5F2]/50 p-3 max-h-[160px] overflow-y-auto flex flex-col gap-2 transition-colors ${
+                <div className={`border rounded-xl bg-[#F8F5F2]/50 p-2.5 max-h-[160px] overflow-y-auto flex flex-col gap-2 transition-colors ${
                   groupValidationError && newGroupMemberIds.length === 0
                     ? 'border-[#C86D51] bg-[#FDF3F0]/20'
                     : 'border-[#E6E1DA]'
@@ -1160,20 +1318,20 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex gap-2 justify-end pt-3 border-t border-[#E6E1DA]" id="group-form-actions">
+              <div className="flex gap-2 justify-end pt-3 border-t border-[#E6E1DA] pb-safe" id="group-form-actions">
                 <button
                   type="button"
                   onClick={() => {
                     setIsCreateGroupOpen(false);
                     setGroupValidationError(null);
                   }}
-                  className="px-4 py-2 border border-[#E6E1DA] hover:bg-[#F8F5F2] text-[#2C2B29] font-medium text-xs rounded-xl transition-colors cursor-pointer"
+                  className="px-4 py-2.5 border border-[#E6E1DA] hover:bg-[#F8F5F2] text-[#2C2B29] font-medium text-xs rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#3C5A48] hover:bg-[#2E4738] text-white font-semibold text-xs rounded-xl transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2.5 bg-[#3C5A48] hover:bg-[#2E4738] text-white font-semibold text-xs rounded-xl transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                   Create Group

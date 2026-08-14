@@ -123,77 +123,77 @@ export default function DashboardView({
   };
 
   return (
-    <div className="flex flex-col gap-6" id="dashboard-view-main">
+    <div className="flex flex-col gap-4 sm:gap-6" id="dashboard-view-main">
       
       {/* 3-Card Summary Financial Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4" id="dashboard-stats-grid">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4" id="dashboard-stats-grid">
         {/* Card 1: Net Balance */}
-        <div className="bg-white border border-[#E6E1DA] rounded-2xl p-5 shadow-xs flex items-center justify-between" id="stat-total-balance">
-          <div className="flex flex-col gap-1">
+        <div className="bg-white border border-[#E6E1DA] rounded-2xl p-4 sm:p-5 shadow-xs flex items-center justify-between" id="stat-total-balance">
+          <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
             <span className="text-[10px] font-bold text-[#736F6A] uppercase tracking-wider">Total Net Position</span>
-            <span className={`text-xl md:text-2xl font-black ${netBalance > 0.01 ? 'text-[#2E7D52]' : netBalance < -0.01 ? 'text-[#C86D51]' : 'text-[#736F6A]'}`}>
+            <span className={`text-xl sm:text-2xl font-black truncate ${netBalance > 0.01 ? 'text-[#2E7D52]' : netBalance < -0.01 ? 'text-[#C86D51]' : 'text-[#736F6A]'}`}>
               {formatAmount(netBalance, currency, true)}
             </span>
-            <span className="text-xs text-[#736F6A]">across all groups & friends</span>
+            <span className="text-[11px] text-[#736F6A] truncate">across all groups & friends</span>
           </div>
-          <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${netBalance > 0.01 ? 'bg-[#EEF7F2] text-[#2E7D52]' : netBalance < -0.01 ? 'bg-[#FDF3F0] text-[#C86D51]' : 'bg-[#F8F5F2] text-[#736F6A]'}`}>
+          <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0 ${netBalance > 0.01 ? 'bg-[#EEF7F2] text-[#2E7D52]' : netBalance < -0.01 ? 'bg-[#FDF3F0] text-[#C86D51]' : 'bg-[#F8F5F2] text-[#736F6A]'}`}>
             <Wallet className="w-5 h-5" />
           </div>
         </div>
 
         {/* Card 2: You Owe */}
-        <div className="bg-white border border-[#E6E1DA] rounded-2xl p-5 shadow-xs flex items-center justify-between" id="stat-you-owe">
-          <div className="flex flex-col gap-1">
+        <div className="bg-white border border-[#E6E1DA] rounded-2xl p-4 sm:p-5 shadow-xs flex items-center justify-between" id="stat-you-owe">
+          <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
             <span className="text-[10px] font-bold text-[#736F6A] uppercase tracking-wider">You Owe Overall</span>
-            <span className="text-xl md:text-2xl font-black text-[#C86D51]">
+            <span className="text-xl sm:text-2xl font-black text-[#C86D51] truncate">
               {formatAmount(totalYouOwe, currency)}
             </span>
-            <span className="text-xs text-[#736F6A]">payments you need to make</span>
+            <span className="text-[11px] text-[#736F6A] truncate">payments you need to make</span>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-[#FDF3F0] text-[#C86D51] flex items-center justify-center">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#FDF3F0] text-[#C86D51] flex items-center justify-center shrink-0">
             <TrendingDown className="w-5 h-5" />
           </div>
         </div>
 
         {/* Card 3: You Are Owed */}
-        <div className="bg-white border border-[#E6E1DA] rounded-2xl p-5 shadow-xs flex items-center justify-between" id="stat-you-are-owed">
-          <div className="flex flex-col gap-1">
+        <div className="bg-white border border-[#E6E1DA] rounded-2xl p-4 sm:p-5 shadow-xs flex items-center justify-between" id="stat-you-are-owed">
+          <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
             <span className="text-[10px] font-bold text-[#736F6A] uppercase tracking-wider">You Are Owed</span>
-            <span className="text-xl md:text-2xl font-black text-[#2E7D52]">
+            <span className="text-xl sm:text-2xl font-black text-[#2E7D52] truncate">
               {formatAmount(totalYouAreOwed, currency)}
             </span>
-            <span className="text-xs text-[#736F6A]">outstanding paybacks due</span>
+            <span className="text-[11px] text-[#736F6A] truncate">outstanding paybacks due</span>
           </div>
-          <div className="w-11 h-11 rounded-xl bg-[#EEF7F2] text-[#2E7D52] flex items-center justify-center">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#EEF7F2] text-[#2E7D52] flex items-center justify-center shrink-0">
             <TrendingUp className="w-5 h-5" />
           </div>
         </div>
       </div>
 
       {/* Main Two-Column Panel Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="dashboard-panels-container">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6" id="dashboard-panels-container">
         
         {/* Left Column: Monthly Trends & Balances (7/12 cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-5" id="dashboard-left-panel">
+        <div className="lg:col-span-7 flex flex-col gap-4 sm:gap-5" id="dashboard-left-panel">
 
           {/* Monthly Spending Trends Chart Card */}
-          <div className="bg-white border border-[#E6E1DA] rounded-2xl p-5 shadow-xs flex flex-col gap-3" id="monthly-spending-trends-card">
+          <div className="bg-white border border-[#E6E1DA] rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col gap-3" id="monthly-spending-trends-card">
             <div className="flex items-center justify-between border-b border-[#E6E1DA] pb-3">
               <div>
-                <h3 className="font-bold text-[#2C2B29] text-base flex items-center gap-2">
+                <h3 className="font-bold text-[#2C2B29] text-sm sm:text-base flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-[#3C5A48]" />
                   Monthly Spending Trends
                 </h3>
-                <p className="text-xs text-[#736F6A]">Your total money paid vs your calculated split share</p>
+                <p className="text-[11px] sm:text-xs text-[#736F6A]">Your total money paid vs your calculated split share</p>
               </div>
             </div>
 
-            <div className="h-56 w-full pt-2">
+            <div className="h-48 sm:h-56 w-full pt-1">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyTrendsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <BarChart data={monthlyTrendsData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E6E1DA" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#736F6A' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#736F6A' }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#736F6A' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#736F6A' }} axisLine={false} tickLine={false} />
                   <ReTooltip
                     formatter={(val: number) => [formatAmount(val, currency), '']}
                     contentStyle={{
@@ -204,7 +204,7 @@ export default function DashboardView({
                       fontSize: '12px',
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '4px' }} />
                   <Bar dataKey="paid" name="You Paid Out" fill="#3C5A48" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="share" name="Your Split Share" fill="#D9A05B" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -212,14 +212,14 @@ export default function DashboardView({
             </div>
           </div>
 
-          <div className="bg-white border border-[#E6E1DA] rounded-2xl p-5 shadow-xs flex flex-col gap-4">
+          <div className="bg-white border border-[#E6E1DA] rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col gap-4">
             <h2 className="text-base font-bold text-[#2C2B29] tracking-tight">Active Balances Breakdown</h2>
 
             {/* Sub-Section: You Owe */}
             <div className="flex flex-col gap-2.5" id="sub-you-owe-section">
               <span className="text-xs font-bold text-[#736F6A] uppercase tracking-wider block">You Owe These People</span>
               {myDebtsToOthers.length === 0 ? (
-                <div className="p-4 border border-[#E6E1DA] rounded-xl bg-[#FAF8F5]/50 text-[#736F6A] text-xs flex items-center gap-2">
+                <div className="p-3.5 border border-[#E6E1DA] rounded-xl bg-[#FAF8F5]/50 text-[#736F6A] text-xs flex items-center gap-2">
                   <span>✓</span>
                   <span>You do not owe anyone money overall! Awesome job.</span>
                 </div>
@@ -230,28 +230,28 @@ export default function DashboardView({
                     return (
                       <div
                         key={idx}
-                        className="border border-[#E6E1DA] hover:border-[#3C5A48]/40 rounded-xl p-3 flex items-center justify-between gap-3 bg-white transition-all"
+                        className="border border-[#E6E1DA] hover:border-[#3C5A48]/40 rounded-xl p-3 flex items-center justify-between gap-2.5 sm:gap-3 bg-white transition-all shadow-2xs"
                         id={`my-debt-${debt.to}`}
                       >
                         <button
                           onClick={() => onNavigateToFriend(debt.to)}
-                          className="flex items-center gap-3 text-left hover:opacity-85 cursor-pointer"
+                          className="flex items-center gap-2.5 sm:gap-3 text-left hover:opacity-85 cursor-pointer min-w-0 flex-1"
                           type="button"
                         >
                           <img
                             src={creditor?.avatar}
                             alt={creditor?.name}
-                            className="w-8 h-8 rounded-full object-cover border border-[#E6E1DA]"
+                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-[#E6E1DA] shrink-0"
                             referrerPolicy="no-referrer"
                           />
-                          <div>
-                            <h4 className="text-sm font-bold text-[#2C2B29]">{creditor?.name}</h4>
-                            <p className="text-xs text-[#736F6A]">You owe them <strong className="text-[#C86D51] font-bold">{formatAmount(debt.amount, currency)}</strong></p>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-xs sm:text-sm font-bold text-[#2C2B29] truncate">{creditor?.name}</h4>
+                            <p className="text-[11px] sm:text-xs text-[#736F6A] truncate">You owe <strong className="text-[#C86D51] font-bold">{formatAmount(debt.amount, currency)}</strong></p>
                           </div>
                         </button>
                         <button
                           onClick={() => onSettleDebt(currentUser.id, debt.to, debt.amount, null)}
-                          className="px-3 py-1.5 border border-[#3C5A48] hover:bg-[#EBF1ED] text-[#3C5A48] font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                          className="px-3 py-1.5 border border-[#3C5A48] hover:bg-[#EBF1ED] active:scale-95 text-[#3C5A48] font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0"
                           type="button"
                           id={`settle-creditor-${debt.to}`}
                         >
@@ -269,7 +269,7 @@ export default function DashboardView({
             <div className="flex flex-col gap-2.5 mt-2" id="sub-you-owed-section">
               <span className="text-xs font-bold text-[#736F6A] uppercase tracking-wider block">These People Owe You</span>
               {othersDebtsToMe.length === 0 ? (
-                <div className="p-4 border border-[#E6E1DA] rounded-xl bg-[#FAF8F5]/50 text-[#736F6A] text-xs flex items-center gap-2">
+                <div className="p-3.5 border border-[#E6E1DA] rounded-xl bg-[#FAF8F5]/50 text-[#736F6A] text-xs flex items-center gap-2">
                   <span>ℹ</span>
                   <span>Nobody owes you any money right now.</span>
                 </div>
@@ -280,28 +280,28 @@ export default function DashboardView({
                     return (
                       <div
                         key={idx}
-                        className="border border-[#E6E1DA] hover:border-[#3C5A48]/40 rounded-xl p-3 flex items-center justify-between gap-3 bg-white transition-all"
+                        className="border border-[#E6E1DA] hover:border-[#3C5A48]/40 rounded-xl p-3 flex items-center justify-between gap-2.5 sm:gap-3 bg-white transition-all shadow-2xs"
                         id={`other-debt-${debt.from}`}
                       >
                         <button
                           onClick={() => onNavigateToFriend(debt.from)}
-                          className="flex items-center gap-3 text-left hover:opacity-85 cursor-pointer"
+                          className="flex items-center gap-2.5 sm:gap-3 text-left hover:opacity-85 cursor-pointer min-w-0 flex-1"
                           type="button"
                         >
                           <img
                             src={debtor?.avatar}
                             alt={debtor?.name}
-                            className="w-8 h-8 rounded-full object-cover border border-[#E6E1DA]"
+                            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover border border-[#E6E1DA] shrink-0"
                             referrerPolicy="no-referrer"
                           />
-                          <div>
-                            <h4 className="text-sm font-bold text-[#2C2B29]">{debtor?.name}</h4>
-                            <p className="text-xs text-[#736F6A]">They owe you <strong className="text-[#2E7D52] font-bold">{formatAmount(debt.amount, currency)}</strong></p>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-xs sm:text-sm font-bold text-[#2C2B29] truncate">{debtor?.name}</h4>
+                            <p className="text-[11px] sm:text-xs text-[#736F6A] truncate">Owes you <strong className="text-[#2E7D52] font-bold">{formatAmount(debt.amount, currency)}</strong></p>
                           </div>
                         </button>
                         <button
                           onClick={() => onSettleDebt(debt.from, currentUser.id, debt.amount, null)}
-                          className="px-3 py-1.5 border border-[#3C5A48] hover:bg-[#EBF1ED] text-[#3C5A48] font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1"
+                          className="px-3 py-1.5 border border-[#3C5A48] hover:bg-[#EBF1ED] active:scale-95 text-[#3C5A48] font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0"
                           type="button"
                           id={`settle-debtor-${debt.from}`}
                         >
@@ -319,13 +319,13 @@ export default function DashboardView({
 
         {/* Right Column: Recent Activity Feed (5/12 cols) */}
         <div className="lg:col-span-5 flex flex-col gap-5" id="dashboard-right-panel">
-          <div className="bg-white border border-[#E6E1DA] rounded-2xl p-5 shadow-xs flex flex-col gap-4">
+          <div className="bg-white border border-[#E6E1DA] rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col gap-4">
             <div className="flex items-center justify-between" id="activity-header">
               <h2 className="text-base font-bold text-[#2C2B29] tracking-tight">Recent Activity</h2>
               <Clock className="w-4 h-4 text-[#736F6A]" />
             </div>
 
-            <div className="flex flex-col gap-4 max-h-[380px] overflow-y-auto pr-1" id="activity-timeline">
+            <div className="flex flex-col gap-3.5 max-h-[340px] sm:max-h-[380px] overflow-y-auto pr-1 no-scrollbar" id="activity-timeline">
               {activities.length === 0 ? (
                 <div className="p-8 text-center text-[#736F6A] text-xs flex items-center justify-center">
                   No activity recorded yet.
@@ -337,9 +337,9 @@ export default function DashboardView({
                   .map((act) => {
                     const actUser = memberMap[act.userId];
                     return (
-                      <div key={act.id} className="flex items-start gap-3 text-xs border-l-2 border-[#E6E1DA] pb-4 pl-4 relative last:pb-0 last:border-transparent" id={`activity-item-${act.id}`}>
+                      <div key={act.id} className="flex items-start gap-3 text-xs border-l-2 border-[#E6E1DA] pb-3.5 pl-3.5 relative last:pb-0 last:border-transparent" id={`activity-item-${act.id}`}>
                         {/* Dot indicator */}
-                        <div className="absolute -left-[6px] top-1 w-2.5 h-2.5 bg-[#3C5A48] rounded-full border-2 border-white"></div>
+                        <div className="absolute -left-[5.5px] top-1 w-2.5 h-2.5 bg-[#3C5A48] rounded-full border-2 border-white"></div>
                         
                         <img
                           src={actUser?.avatar}
@@ -347,8 +347,8 @@ export default function DashboardView({
                           className="w-6 h-6 rounded-full object-cover mt-0.5 border border-[#E6E1DA] flex-shrink-0"
                           referrerPolicy="no-referrer"
                         />
-                        <div className="flex flex-col gap-1 min-w-0 flex-1">
-                          <p className="text-[#736F6A] leading-normal">
+                        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                          <p className="text-[#736F6A] leading-normal text-[11px] sm:text-xs">
                             <strong className="text-[#2C2B29] font-semibold">{actUser?.id === currentUser.id ? 'You' : actUser?.name}</strong>{' '}
                             {act.description}
                           </p>

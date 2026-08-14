@@ -135,7 +135,7 @@ export default function NotificationsView({
 
       {/* Filter Tabs & Content */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-2 border-b border-[#E6E1DA] pb-2 overflow-x-auto">
+        <div className="flex items-center gap-2 border-b border-[#E6E1DA] pb-2 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setFilter('all')}

@@ -61,18 +61,23 @@ export default function SettingsModal({
   const activeCurrencyConfig = getCurrencyConfig(selectedCurrency);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2C2B29]/40 backdrop-blur-xs animate-fadeIn" id="settings-modal-backdrop">
-      <div className="bg-white border border-[#E6E1DA] rounded-3xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]" id="settings-modal-container">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#2C2B29]/40 backdrop-blur-xs animate-fadeIn" id="settings-modal-backdrop">
+      <div className="bg-white border border-[#E6E1DA] rounded-t-3xl sm:rounded-3xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[92vh] animate-sheet-up sm:animate-none" id="settings-modal-container">
         
+        {/* Mobile Drag Handle */}
+        <div className="sm:hidden pt-3 pb-1 flex justify-center">
+          <div className="w-10 h-1 rounded-full bg-[#E6E1DA]" />
+        </div>
+
         {/* Header */}
-        <div className="p-5 border-b border-[#E6E1DA] bg-[#FAF8F5] flex items-center justify-between" id="settings-modal-header">
+        <div className="p-4 sm:p-5 border-b border-[#E6E1DA] bg-[#FAF8F5] flex items-center justify-between" id="settings-modal-header">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#EBF1ED] text-[#3C5A48] flex items-center justify-center border border-[#E6E1DA]">
-              <Settings className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#EBF1ED] text-[#3C5A48] flex items-center justify-center border border-[#E6E1DA] shrink-0">
+              <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-[#2C2B29]">App Settings & Preferences</h2>
-              <p className="text-[11px] text-[#736F6A]">Customize currency, profile & app data</p>
+              <h2 className="text-sm sm:text-base font-extrabold text-[#2C2B29]">App Settings & Preferences</h2>
+              <p className="text-[11px] sm:text-xs text-[#736F6A]">Customize currency, profile & app data</p>
             </div>
           </div>
           <button

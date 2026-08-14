@@ -82,22 +82,27 @@ export default function AddFriendModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2C2B29]/40 backdrop-blur-xs animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#2C2B29]/40 backdrop-blur-xs animate-fadeIn"
       id="add-friend-backdrop"
     >
       <div
-        className="bg-white rounded-2xl border border-[#E6E1DA] shadow-xl max-w-md w-full flex flex-col overflow-hidden animate-scaleUp"
+        className="bg-white rounded-t-3xl sm:rounded-2xl border border-[#E6E1DA] shadow-xl max-w-md w-full flex flex-col max-h-[92vh] overflow-hidden animate-sheet-up sm:animate-none"
         id="add-friend-modal"
       >
+        {/* Mobile Drag Handle */}
+        <div className="sm:hidden pt-3 pb-1 flex justify-center">
+          <div className="w-10 h-1 rounded-full bg-[#E6E1DA]" />
+        </div>
+
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-[#E6E1DA] bg-[#FAF8F5]">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#E6E1DA] bg-[#FAF8F5]">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#3C5A48] flex items-center justify-center text-white shadow-xs">
-              <UserPlus className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#3C5A48] flex items-center justify-center text-white shadow-xs shrink-0">
+              <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-[#2C2B29]">Add Friends</h2>
-              <p className="text-xs text-[#736F6A]">Search users or invite friends directly</p>
+              <h2 className="text-sm sm:text-base font-extrabold text-[#2C2B29]">Add Friends</h2>
+              <p className="text-[11px] sm:text-xs text-[#736F6A]">Search users or invite friends directly</p>
             </div>
           </div>
           <button

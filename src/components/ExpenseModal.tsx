@@ -251,16 +251,21 @@ export default function ExpenseModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#2C2B29]/40 backdrop-blur-xs transition-opacity" id="expense-modal-backdrop">
-      <div className="bg-white rounded-2xl border border-[#E6E1DA] shadow-xl max-w-lg w-full flex flex-col max-h-[90vh]" id="expense-modal-content">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#2C2B29]/40 backdrop-blur-xs transition-opacity animate-fadeIn" id="expense-modal-backdrop">
+      <div className="bg-white rounded-t-3xl sm:rounded-2xl border border-[#E6E1DA] shadow-xl max-w-lg w-full flex flex-col max-h-[92vh] animate-sheet-up sm:animate-none overflow-hidden" id="expense-modal-content">
         
+        {/* Mobile Drag Handle */}
+        <div className="sm:hidden pt-3 pb-1 flex justify-center">
+          <div className="w-10 h-1 rounded-full bg-[#E6E1DA]" />
+        </div>
+
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-[#E6E1DA]" id="expense-modal-header">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-[#E6E1DA]" id="expense-modal-header">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[#3C5A48] flex items-center justify-center text-white" id="header-icon-container">
+            <div className="w-8 h-8 rounded-lg bg-[#3C5A48] flex items-center justify-center text-white shrink-0" id="header-icon-container">
               {isEditing ? <Edit3 className="w-4 h-4" /> : <Users className="w-4 h-4" />}
             </div>
-            <h2 className="text-lg font-bold text-[#2C2B29]">{isEditing ? 'Edit Expense' : 'Add an Expense'}</h2>
+            <h2 className="text-base sm:text-lg font-bold text-[#2C2B29]">{isEditing ? 'Edit Expense' : 'Add an Expense'}</h2>
           </div>
 
           <div className="flex items-center gap-2" id="header-action-group">
@@ -286,8 +291,8 @@ export default function ExpenseModal({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 flex flex-col gap-5">
-          {/* Category Dropdown & Presets */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 sm:gap-5">
+          {/* Category Dropdown */}
           <div className="flex flex-col gap-1.5" id="category-selector-container">
             <label htmlFor="expense-category" className="text-xs font-bold text-[#2C2B29] flex items-center gap-1">
               <Tag className="w-3.5 h-3.5 text-[#3C5A48]" /> Category
@@ -309,10 +314,10 @@ export default function ExpenseModal({
           </div>
 
           {/* Top Priority Inputs: Amount & Description */}
-          <div className="flex flex-col gap-3.5 bg-[#FAF8F5] p-3.5 rounded-2xl border border-[#E6E1DA]" id="top-amount-desc-section">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          <div className="flex flex-col gap-3 bg-[#FAF8F5] p-3 sm:p-3.5 rounded-2xl border border-[#E6E1DA]" id="top-amount-desc-section">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
               {/* Amount - Prominent First Input */}
-              <div className="md:col-span-5 flex flex-col gap-1" id="amount-container">
+              <div className="sm:col-span-5 flex flex-col gap-1" id="amount-container">
                 <label htmlFor="expense-amount" className="text-xs font-black text-[#3C5A48] uppercase tracking-wider flex items-center gap-1">
                   Total Cost ({currencyConfig.symbol}) *
                 </label>
@@ -323,6 +328,7 @@ export default function ExpenseModal({
                   <input
                     id="expense-amount"
                     type="text"
+                    inputMode="decimal"
                     autoFocus
                     placeholder="0.00"
                     value={amountStr}
@@ -338,14 +344,14 @@ export default function ExpenseModal({
               </div>
 
               {/* Description */}
-              <div className="md:col-span-7 flex flex-col gap-1" id="desc-container">
+              <div className="sm:col-span-7 flex flex-col gap-1" id="desc-container">
                 <label htmlFor="expense-desc" className="text-xs font-bold text-[#2C2B29]">Expense Description <span className="text-[10px] text-[#736F6A] font-normal">(Optional)</span></label>
                 <div className="relative">
-                  <FileText className="w-4 h-4 absolute left-3 top-3 text-[#736F6A]" />
+                  <FileText className="w-4 h-4 absolute left-3 top-2.5 text-[#736F6A]" />
                   <input
                     id="expense-desc"
                     type="text"
-                    placeholder="e.g. Dinner, Groceries, Taxi (Optional)"
+                    placeholder="e.g. Dinner, Groceries, Taxi"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 bg-white border border-[#E6E1DA] rounded-xl text-sm font-medium focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] transition-colors text-[#2C2B29]"
@@ -354,8 +360,8 @@ export default function ExpenseModal({
               </div>
             </div>
 
-            {/* Quick Category Chips */}
-            <div className="flex flex-wrap gap-1.5 pt-1" id="category-chips">
+            {/* Horizontal Scrollable Category Chips */}
+            <div className="flex overflow-x-auto gap-1.5 py-0.5 no-scrollbar" id="category-chips">
               {[
                 { label: '🍔 Dinner', cat: 'food' },
                 { label: '🛒 Groceries', cat: 'groceries' },
@@ -376,7 +382,7 @@ export default function ExpenseModal({
                       setDescription(`${chip.label} - ${description}`);
                     }
                   }}
-                  className={`px-2.5 py-1 border text-[11px] font-semibold rounded-lg transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 border text-[11px] font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                     category === chip.cat
                       ? 'border-[#3C5A48] bg-[#EBF1ED] text-[#3C5A48]'
                       : 'border-[#E6E1DA] bg-white hover:border-[#3C5A48] hover:bg-[#EBF1ED]/40 text-[#2C2B29]'
@@ -389,7 +395,7 @@ export default function ExpenseModal({
           </div>
 
           {/* Group / Individual Scope Selector & Date */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3" id="scope-selector-group">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" id="scope-selector-group">
             <div className="flex flex-col gap-1.5" id="group-select-container">
               <label htmlFor="group-select" className="text-xs font-bold text-[#2C2B29]">Group Association</label>
               <div className="relative">
@@ -404,7 +410,7 @@ export default function ExpenseModal({
                   }}
                   className="w-full pl-3 pr-8 py-2 border border-[#E6E1DA] rounded-xl text-xs appearance-none bg-white focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] transition-colors text-[#2C2B29]"
                 >
-                  <option value="none">Non-Group (Individual)</option>
+                  <option value="none">Non-Group (Direct)</option>
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
@@ -452,12 +458,12 @@ export default function ExpenseModal({
             </div>
           </div>
 
-          <div className="border-t border-[#E6E1DA] my-1"></div>
+          <div className="border-t border-[#E6E1DA]"></div>
 
-          {/* Quick Splitwise Shortcut Buttons */}
+          {/* Quick Split Presets */}
           <div className="flex flex-col gap-2" id="quick-split-presets">
             <span className="text-xs font-bold text-[#2C2B29]">Quick Split Presets</span>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               <button
                 type="button"
                 onClick={() => {
@@ -465,7 +471,7 @@ export default function ExpenseModal({
                   setSplitMethod('equally');
                   setIncludedUserIds(eligibleUsers.map((u) => u.id));
                 }}
-                className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                   paidBy === currentUser.id && splitMethod === 'equally' && includedUserIds.length === eligibleUsers.length
                     ? 'border-[#3C5A48] bg-[#EBF1ED] text-[#3C5A48] font-bold'
                     : 'border-[#E6E1DA] bg-white hover:bg-[#FAF8F5] text-[#2C2B29]'
@@ -486,7 +492,7 @@ export default function ExpenseModal({
                       setIncludedUserIds(eligibleUsers.map((u) => u.id));
                     }
                   }}
-                  className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                     paidBy !== currentUser.id && splitMethod === 'equally' && includedUserIds.length === eligibleUsers.length
                       ? 'border-[#3C5A48] bg-[#EBF1ED] text-[#3C5A48] font-bold'
                       : 'border-[#E6E1DA] bg-white hover:bg-[#FAF8F5] text-[#2C2B29]'
@@ -501,19 +507,19 @@ export default function ExpenseModal({
             </div>
           </div>
 
-          <div className="border-t border-[#E6E1DA] my-1"></div>
+          <div className="border-t border-[#E6E1DA]"></div>
 
           {/* Payor and Split Style Configuration */}
           <div className="flex flex-col gap-3" id="split-settings">
-            <div className="flex flex-wrap gap-4 items-center" id="split-settings-header">
+            <div className="flex flex-wrap gap-3 items-center justify-between" id="split-settings-header">
               {/* Paid By */}
               <div className="flex items-center gap-1.5" id="paid-by-container">
-                <span className="text-sm text-[#736F6A]">Paid by</span>
+                <span className="text-xs sm:text-sm text-[#736F6A]">Paid by</span>
                 <div className="relative inline-block">
                   <select
                     value={paidBy}
                     onChange={(e) => setPaidBy(e.target.value)}
-                    className="pl-2.5 pr-8 py-1 bg-[#FAF8F5] border border-[#E6E1DA] rounded-lg text-sm font-semibold text-[#2C2B29] appearance-none focus:outline-none focus:border-[#3C5A48] cursor-pointer"
+                    className="pl-2.5 pr-8 py-1.5 bg-[#FAF8F5] border border-[#E6E1DA] rounded-lg text-xs sm:text-sm font-semibold text-[#2C2B29] appearance-none focus:outline-none focus:border-[#3C5A48] cursor-pointer"
                   >
                     {eligibleUsers.map((u) => (
                       <option key={u.id} value={u.id}>
@@ -521,33 +527,33 @@ export default function ExpenseModal({
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="w-3 h-3 absolute right-2.5 top-2.5 text-[#736F6A] pointer-events-none" />
+                  <ChevronDown className="w-3 h-3 absolute right-2.5 top-3 text-[#736F6A] pointer-events-none" />
                 </div>
               </div>
 
               {/* Split Mode Selector */}
               <div className="flex items-center gap-1.5" id="split-mode-container">
-                <span className="text-sm text-[#736F6A]">and split</span>
+                <span className="text-xs sm:text-sm text-[#736F6A]">Split</span>
                 <div className="relative inline-block">
                   <select
                     value={splitMethod}
                     onChange={(e) => setSplitMethod(e.target.value as SplitMethod)}
-                    className="pl-2.5 pr-8 py-1 bg-[#FAF8F5] border border-[#E6E1DA] rounded-lg text-sm font-semibold text-[#2C2B29] appearance-none focus:outline-none focus:border-[#3C5A48] cursor-pointer"
+                    className="pl-2.5 pr-8 py-1.5 bg-[#FAF8F5] border border-[#E6E1DA] rounded-lg text-xs sm:text-sm font-semibold text-[#2C2B29] appearance-none focus:outline-none focus:border-[#3C5A48] cursor-pointer"
                   >
                     <option value="equally">Equally</option>
                     <option value="exactly">Exactly ($)</option>
                     <option value="percentage">By Percent (%)</option>
                   </select>
-                  <ChevronDown className="w-3 h-3 absolute right-2.5 top-2.5 text-[#736F6A] pointer-events-none" />
+                  <ChevronDown className="w-3 h-3 absolute right-2.5 top-3 text-[#736F6A] pointer-events-none" />
                 </div>
               </div>
             </div>
 
             {/* Split Distribution List */}
-            <div className="border border-[#E6E1DA] rounded-xl bg-[#FAF8F5] p-4 flex flex-col gap-3" id="split-distribution-list">
-              <span className="text-xs font-bold text-[#736F6A] uppercase tracking-wider block">Split Details</span>
+            <div className="border border-[#E6E1DA] rounded-xl bg-[#FAF8F5] p-3 sm:p-4 flex flex-col gap-3" id="split-distribution-list">
+              <span className="text-[10px] sm:text-xs font-bold text-[#736F6A] uppercase tracking-wider block">Split Details</span>
               
-              <div className="flex flex-col gap-2.5" id="split-rows-container">
+              <div className="flex flex-col gap-2" id="split-rows-container">
                 {eligibleUsers.map((user) => {
                   const isIncluded = includedUserIds.includes(user.id);
                   const isEqually = splitMethod === 'equally';
@@ -560,43 +566,44 @@ export default function ExpenseModal({
                   return (
                     <div
                       key={user.id}
-                      className={`flex items-center justify-between p-2 rounded-lg transition-colors ${isIncluded ? 'bg-white border border-[#E6E1DA]' : 'opacity-60'}`}
+                      className={`flex items-center justify-between p-2.5 rounded-xl transition-colors ${isIncluded ? 'bg-white border border-[#E6E1DA] shadow-2xs' : 'opacity-50'}`}
                       id={`split-row-${user.id}`}
                     >
                       {/* Left: User name & select checkbox */}
                       <button
                         type="button"
                         onClick={() => toggleUserSplit(user.id)}
-                        className="flex items-center gap-2.5 text-left flex-1 cursor-pointer"
+                        className="flex items-center gap-2.5 text-left flex-1 cursor-pointer min-w-0"
                         id={`toggle-user-split-${user.id}`}
                       >
-                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${isIncluded ? 'bg-[#3C5A48] border-[#3C5A48] text-white' : 'border-[#E6E1DA] bg-white'}`}>
+                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${isIncluded ? 'bg-[#3C5A48] border-[#3C5A48] text-white' : 'border-[#E6E1DA] bg-white'}`}>
                           {isIncluded && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                         </div>
                         <img
                           src={user.avatar}
                           alt={user.name}
-                          className="w-7 h-7 rounded-full object-cover"
+                          className="w-7 h-7 rounded-full object-cover shrink-0"
                           referrerPolicy="no-referrer"
                         />
-                        <span className="text-sm font-medium text-[#2C2B29]">
+                        <span className="text-xs sm:text-sm font-semibold text-[#2C2B29] truncate">
                           {user.id === currentUser.id ? 'You' : user.name}
                         </span>
                       </button>
 
                       {/* Right: Input or computed share */}
-                      <div className="flex items-center gap-2" id={`input-container-${user.id}`}>
+                      <div className="flex items-center gap-2 shrink-0" id={`input-container-${user.id}`}>
                         {isIncluded && !isEqually && (
-                          <div className="relative w-24">
+                          <div className="relative w-20 sm:w-24">
                             {splitMethod === 'exactly' && (
                               <DollarSign className="w-3 h-3 absolute left-2 top-2.5 text-[#736F6A]" />
                             )}
                             <input
                               type="text"
+                              inputMode="decimal"
                               placeholder="0"
                               value={customInputs[user.id] || ''}
                               onChange={(e) => handleInputChange(user.id, e.target.value)}
-                              className={`w-full py-1 text-right rounded-lg border border-[#E6E1DA] text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] pr-2 text-[#2C2B29] ${splitMethod === 'exactly' ? 'pl-5' : 'pr-6'}`}
+                              className={`w-full py-1 text-right rounded-lg border border-[#E6E1DA] text-xs sm:text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] pr-2 text-[#2C2B29] ${splitMethod === 'exactly' ? 'pl-5' : 'pr-6'}`}
                             />
                             {splitMethod === 'percentage' && (
                               <span className="text-xs text-[#736F6A] absolute right-2 top-1.5">%</span>
@@ -604,8 +611,8 @@ export default function ExpenseModal({
                           </div>
                         )}
 
-                        <div className="text-right min-w-[70px]">
-                          <span className="text-sm font-semibold text-[#2C2B29]">
+                        <div className="text-right min-w-[65px]">
+                          <span className="text-xs sm:text-sm font-bold text-[#2C2B29]">
                             {formatAmount(computedVal, currency)}
                           </span>
                           {splitMethod === 'percentage' && isIncluded && (
@@ -621,34 +628,34 @@ export default function ExpenseModal({
               </div>
 
               {/* Validation helper status bar */}
-              <div className="flex items-center justify-between border-t border-[#E6E1DA] pt-3 mt-1 text-xs" id="status-helper-bar">
+              <div className="flex items-center justify-between border-t border-[#E6E1DA] pt-2.5 mt-1 text-[11px] sm:text-xs" id="status-helper-bar">
                 {splitMethod === 'equally' ? (
-                  <span className="text-[#736F6A]">
-                    Split equally among {includedUserIds.length} participant{includedUserIds.length !== 1 ? 's' : ''}
+                  <span className="text-[#736F6A] truncate">
+                    Split among {includedUserIds.length} participant{includedUserIds.length !== 1 ? 's' : ''}
                   </span>
                 ) : splitMethod === 'exactly' ? (
-                  <span className={`${remaining === 0 ? 'text-[#2E7D52] font-semibold' : 'text-[#736F6A]'}`}>
+                  <span className={`truncate ${remaining === 0 ? 'text-[#2E7D52] font-semibold' : 'text-[#736F6A]'}`}>
                     {remaining === 0 ? (
                       '✓ Perfect balance'
                     ) : remaining > 0 ? (
-                      `${formatAmount(remaining, currency)} left to assign`
+                      `${formatAmount(remaining, currency)} left`
                     ) : (
-                      `Over-assigned by ${formatAmount(Math.abs(remaining), currency)}`
+                      `Over by ${formatAmount(Math.abs(remaining), currency)}`
                     )}
                   </span>
                 ) : (
-                  <span className={`${remaining === 0 ? 'text-[#2E7D52] font-semibold' : 'text-[#736F6A]'}`}>
+                  <span className={`truncate ${remaining === 0 ? 'text-[#2E7D52] font-semibold' : 'text-[#736F6A]'}`}>
                     {remaining === 0 ? (
                       '✓ Perfect 100%'
                     ) : remaining > 0 ? (
-                      `${remaining.toFixed(1)}% left to assign`
+                      `${remaining.toFixed(1)}% left`
                     ) : (
-                      `Over-assigned by ${Math.abs(remaining).toFixed(1)}%`
+                      `Over by ${Math.abs(remaining).toFixed(1)}%`
                     )}
                   </span>
                 )}
                 
-                <span className="text-[#736F6A] font-medium">
+                <span className="text-[#736F6A] font-medium shrink-0">
                   Total: <strong className="text-[#2C2B29]">{formatAmount(totalAmount, currency)}</strong>
                 </span>
               </div>
