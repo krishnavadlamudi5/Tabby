@@ -38,8 +38,8 @@ interface AppState {
   updateProfile: (updatedFields: Partial<User>) => void;
   resetData: () => void;
   
-  createGroup: (name: string, category: GroupCategory, memberIds: string[]) => void;
-  addFriend: (name: string, email: string) => void;
+  createGroup: (name: string, category: GroupCategory, memberIds: string[]) => string;
+  addFriend: (name: string, email: string) => Promise<void>;
   saveExpense: (expenseData: Omit<Expense, 'id' | 'createdBy' | 'createdAt'> | Expense) => void;
   deleteExpense: (expenseId: string) => void;
   settleDebt: (fromUserId: string, toUserId: string, amount: number, groupId: string | null) => void;
@@ -235,7 +235,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   createGroup: (name, category, memberIds) => {
     const { currentUser, groups, activities, users, expenses } = get();
-    if (!currentUser) return;
+    if (!currentUser) return '';
 
     const finalMembers = Array.from(new Set([currentUser.id, ...memberIds]));
     const newGroup: Group = {
@@ -261,6 +261,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     persistUserData(currentUser.id, { users, groups: updatedGroups, expenses, activities: updatedActs });
     set({ groups: updatedGroups, activities: updatedActs });
+    return newGroup.id;
   },
 
   addFriend: async (name, email) => {

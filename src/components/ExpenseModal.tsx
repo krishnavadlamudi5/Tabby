@@ -202,7 +202,7 @@ export default function ExpenseModal({
     setValidationError(null);
 
     if (totalAmount <= 0) {
-      setValidationError('Please enter a valid amount greater than $0.');
+      setValidationError(`Please enter a valid amount greater than ${currencyConfig.symbol}0.`);
       return;
     }
     if (includedUserIds.length === 0) {
@@ -215,7 +215,7 @@ export default function ExpenseModal({
       const enteredSum = computedSplits.reduce((acc, s) => acc + s.amount, 0);
       if (Math.abs(enteredSum - totalAmount) > 0.01) {
         setValidationError(
-          `Sum of individual splits ($${enteredSum.toFixed(2)}) must equal total cost ($${totalAmount.toFixed(2)}). Difference: $${(totalAmount - enteredSum).toFixed(2)}`
+          `Sum of individual splits (${formatAmount(enteredSum, currency)}) must equal total cost (${formatAmount(totalAmount, currency)}). Difference: ${formatAmount(Math.abs(totalAmount - enteredSum), currency)}`
         );
         return;
       }
@@ -279,19 +279,21 @@ export default function ExpenseModal({
                 title="Scan Receipt with AI"
               >
                 <Camera className="w-4 h-4" />
-                <span className="hidden sm:inline">AI Scan</span>
+                <span className="hidden sm:inline">{showScanner ? 'Manual Form' : 'AI Scan'}</span>
               </button>
             )}
-            <button
-              onClick={handleSubmit}
-              type="button"
-              className="px-3.5 py-1.5 bg-[#3C5A48] hover:bg-[#2E4738] active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-              id="top-save-expense-btn"
-              title="Save Expense Now"
-            >
-              <Check className="w-4 h-4 stroke-[3]" />
-              <span>{isEditing ? 'Update' : 'Save'}</span>
-            </button>
+            {!showScanner && (
+              <button
+                onClick={handleSubmit}
+                type="button"
+                className="px-3.5 py-1.5 bg-[#3C5A48] hover:bg-[#2E4738] active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                id="top-save-expense-btn"
+                title="Save Expense Now"
+              >
+                <Check className="w-4 h-4 stroke-[3]" />
+                <span>{isEditing ? 'Update' : 'Save'}</span>
+              </button>
+            )}
             <button
               onClick={onClose}
               className="p-1.5 rounded-xl text-[#736F6A] hover:bg-[#F8F5F2] hover:text-[#2C2B29] transition-colors cursor-pointer"

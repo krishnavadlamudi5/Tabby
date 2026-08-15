@@ -89,6 +89,19 @@ async function linkGhostUser(newUserId: string, email: string, phone?: string) {
   }
 }
 
+// Helper to construct flexible phone queries
+function getPhoneQuery(phoneInput: string) {
+  const clean = phoneInput.trim();
+  const digits = phoneInput.replace(/\D/g, '');
+  const conditions: any[] = [{ phone: clean }];
+  if (digits.length >= 7) {
+    const suffix = digits.slice(-10);
+    conditions.push({ phone: new RegExp(`${suffix}$`) });
+    conditions.push({ email: `${digits}@tabby.app` });
+  }
+  return conditions;
+}
+
 // POST /api/auth/send-otp (Send 6-digit verification code for register or reset)
 router.post('/send-otp', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -102,12 +115,14 @@ router.post('/send-otp', async (req: Request, res: Response): Promise<void> => {
     
     if (type === 'reset') {
       // For reset, check if user exists
-      const user = await User.findOne({
-        $or: [
-          { email: key },
-          { phone: destination.trim() }
-        ]
-      });
+      let user = null;
+      if (key.includes('@')) {
+        user = await User.findOne({ email: key });
+      } else {
+        const phoneConditions = getPhoneQuery(destination);
+        user = await User.findOne({ $or: phoneConditions });
+      }
+
       if (!user) {
         res.status(404).json({ error: 'No account found with this email or phone number.' });
         return;
@@ -200,12 +215,13 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const user = await User.findOne({
-      $or: [
-        { email: key },
-        { phone: destination.trim() }
-      ]
-    });
+    let user = null;
+    if (key.includes('@')) {
+      user = await User.findOne({ email: key });
+    } else {
+      const phoneConditions = getPhoneQuery(destination);
+      user = await User.findOne({ $or: phoneConditions });
+    }
 
     if (!user) {
       res.status(404).json({ error: 'User account not found' });
@@ -323,12 +339,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     if (trimmed.includes('@')) {
       user = await User.findOne({ email: trimmed.toLowerCase() });
     } else {
-      user = await User.findOne({
-        $or: [
-          { phone: trimmed },
-          { email: `${trimmed.replace(/\D/g, '')}@tabby.app` }
-        ]
-      });
+      const phoneConditions = getPhoneQuery(trimmed);
+      user = await User.findOne({ $or: phoneConditions });
     }
 
     if (!user) {

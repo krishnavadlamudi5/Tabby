@@ -63,7 +63,7 @@ export default function CreateGroupModal({ isOpen, onClose, onGroupCreated }: Cr
       return;
     }
 
-    createGroup(newGroupName, newGroupCategory, newGroupMemberIds);
+    const newGroupId = createGroup(newGroupName, newGroupCategory, newGroupMemberIds);
     
     // reset
     setNewGroupName('');
@@ -71,9 +71,10 @@ export default function CreateGroupModal({ isOpen, onClose, onGroupCreated }: Cr
     setNewGroupMemberIds([]);
     setGroupValidationError(null);
     
-    // The store assigns a timestamp-based ID, we'd ideally get it back, but we can simulate or query latest
-    // For now just close and let parent navigate or stay on dashboard
     onClose();
+    if (newGroupId) {
+      onGroupCreated(newGroupId);
+    }
   };
 
   return (

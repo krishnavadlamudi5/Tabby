@@ -5,9 +5,8 @@
 
 import React, { useState } from 'react';
 import { User, Expense, Group } from '../types';
-import { calculateNetBalances, simplifyDebts } from '../utils/debtSimplifier';
 import { formatAmount } from '../utils/currency';
-import { Plus, UserCheck, ArrowRight, Trash2, Edit2, CheckCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, UserCheck, Trash2, Edit2, CheckCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface FriendViewProps {
   friend: User;
@@ -44,20 +43,32 @@ export default function FriendView({
     return involvesMe && involvesFriend;
   });
 
-  // Calculate the net debt balance specifically between the current user and this friend.
-  // We can do this by running calculateNetBalances with just current user and friend IDs, over the commonExpenses.
-  const netBalances = React.useMemo(() => {
-    return calculateNetBalances(commonExpenses, [currentUser.id, friend.id]);
+  // Calculate direct bilateral debt between currentUser and friend
+  const netBalanceWithFriend = React.useMemo(() => {
+    let balance = 0;
+    commonExpenses.forEach((tx) => {
+      if (tx.isSettlement) {
+        if (tx.paidBy === currentUser.id && tx.splits.some((s) => s.userId === friend.id)) {
+          balance += tx.amount;
+        } else if (tx.paidBy === friend.id && tx.splits.some((s) => s.userId === currentUser.id)) {
+          balance -= tx.amount;
+        }
+      } else {
+        if (tx.paidBy === currentUser.id) {
+          const friendSplit = tx.splits.find((s) => s.userId === friend.id);
+          if (friendSplit) balance += friendSplit.amount;
+        } else if (tx.paidBy === friend.id) {
+          const mySplit = tx.splits.find((s) => s.userId === currentUser.id);
+          if (mySplit) balance -= mySplit.amount;
+        }
+      }
+    });
+    return Number(balance.toFixed(2));
   }, [commonExpenses, currentUser.id, friend.id]);
 
-  const friendBalance = netBalances[friend.id] || 0; // Negative means friend owes current user, positive means friend is credited
-
-  // Wait, let's understand:
-  // if friendBalance is positive, friend has net positive balance, meaning we owe the friend.
-  // if friendBalance is negative, friend has net negative balance, meaning friend owes us.
-  const iOweFriend = friendBalance > 0.01;
-  const friendOwesMe = friendBalance < -0.01;
-  const absBalance = Math.abs(friendBalance);
+  const friendOwesMe = netBalanceWithFriend > 0.01;
+  const iOweFriend = netBalanceWithFriend < -0.01;
+  const absBalance = Math.abs(netBalanceWithFriend);
 
   const handleSettleUp = () => {
     if (iOweFriend) {

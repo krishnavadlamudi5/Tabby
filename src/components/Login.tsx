@@ -247,9 +247,14 @@ export default function Login({ onLogin }: LoginProps) {
 
   const handleGoogleSubmit = async (customEmail?: string, customName?: string) => {
     setErrorMsg('');
+    const emailToUse = customEmail || googleEmail.trim();
+    if (!emailToUse) {
+      setErrorMsg('Please enter your Google email address.');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const emailToUse = customEmail || googleEmail.trim() || 'alex.morgan@gmail.com';
       const nameToUse = customName || googleName.trim() || emailToUse.split('@')[0];
       const avatarToUse = `https://images.unsplash.com/photo-${1535713875002 + Math.floor(Math.random() * 1000)}?auto=format&fit=crop&w=150&h=150&q=80`;
 
@@ -368,7 +373,9 @@ export default function Login({ onLogin }: LoginProps) {
 
     setIsLoading(true);
     try {
-      const destination = target.includes('@') ? target : `${countryCode}${target}`;
+      const destination = target.includes('@')
+        ? target
+        : (target.startsWith('+') ? target : `${countryCode}${target.replace(/\D/g, '')}`);
       await sendOtpApi(destination, 'reset');
       
       setStep('otp');
@@ -399,7 +406,9 @@ export default function Login({ onLogin }: LoginProps) {
     setIsLoading(true);
     try {
       const target = email.trim() || phoneNumber.trim();
-      const destination = target.includes('@') ? target : `${countryCode}${target}`;
+      const destination = target.includes('@')
+        ? target
+        : (target.startsWith('+') ? target : `${countryCode}${target.replace(/\D/g, '')}`);
       const res = await resetPasswordApi(destination, enteredOtp.trim(), newPassword);
       
       onLogin(res.user);
