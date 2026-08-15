@@ -70,15 +70,7 @@ export default function Login({ onLogin }: LoginProps) {
       onLogin(user);
     } catch (err: any) {
       console.error('Google Sign In Error:', err);
-      // Fallback for demo mode if popup blocked or config issue
-      const googleUser: User = {
-        id: `user-google-${Date.now()}`,
-        name: 'Alex Morgan',
-        email: 'alex.morgan@gmail.com',
-        phone: '+1 555-0199',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
-      };
-      onLogin(googleUser);
+      setErrorMsg(err.message || 'Failed to sign in with Google.');
     } finally {
       setIsLoading(false);
     }
@@ -103,28 +95,8 @@ export default function Login({ onLogin }: LoginProps) {
       const user = await signInWithEmail(userEmailVal, password);
       onLogin(user);
     } catch (err: any) {
-      console.warn('Firebase Email Sign In failed, attempting local fallback check:', err.message);
-      // Match existing demo user if present
-      const matchedUser = DEMO_USERS.find(
-        (u) =>
-          u.email.toLowerCase() === loginIdentifier.toLowerCase() ||
-          u.phone === fullPhone ||
-          u.phone?.replace(/\D/g, '') === loginIdentifier.replace(/\D/g, '')
-      );
-
-      const userToLogin: User = matchedUser || {
-        id: `user-${Date.now()}`,
-        name: loginIdentifier.includes('@')
-          ? loginIdentifier.split('@')[0]
-          : `User ${loginIdentifier.slice(-4)}`,
-        email: loginIdentifier.includes('@')
-          ? loginIdentifier
-          : `${loginIdentifier.replace(/\D/g, '')}@tabby.app`,
-        phone: loginIdentifier.includes('@') ? undefined : fullPhone,
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
-      };
-
-      onLogin(userToLogin);
+      console.error('Firebase Email Sign In failed:', err);
+      setErrorMsg(err.message || 'Failed to sign in. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -176,16 +148,8 @@ export default function Login({ onLogin }: LoginProps) {
       const user = await registerWithEmail(name.trim(), email.trim(), fullPhone, password);
       onLogin(user);
     } catch (err: any) {
-      console.warn('Firebase registration notice:', err.message);
-      const newUser: User = {
-        id: `user-${Date.now()}`,
-        name: name.trim(),
-        email: email.trim(),
-        phone: fullPhone,
-        avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 1000000)}?auto=format&fit=crop&w=150&h=150&q=80`,
-      };
-
-      onLogin(newUser);
+      console.error('Firebase registration error:', err);
+      setErrorMsg(err.message || 'Failed to register account.');
     } finally {
       setIsLoading(false);
     }

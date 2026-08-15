@@ -8,6 +8,8 @@ import {
   onSnapshot,
   getDocs,
   writeBatch,
+  query,
+  where,
 } from 'firebase/firestore';
 import {
   getAuth,
@@ -19,9 +21,17 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
 } from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
 import { User, Group, Expense, Activity } from '../types';
-import { DEMO_USERS, DEMO_GROUPS, DEMO_EXPENSES, DEMO_ACTIVITIES } from '../data/demoData';
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_DATABASE_ID,
+};
 
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -41,36 +51,12 @@ const groupsCol = collection(db, 'groups');
 const expensesCol = collection(db, 'expenses');
 const activitiesCol = collection(db, 'activities');
 
-// Helper to seed initial data if Firestore is empty
-export async function seedInitialFirestoreDataIfEmpty() {
-  try {
-    const usersSnapshot = await getDocs(usersCol);
-    if (usersSnapshot.empty) {
-      const batch = writeBatch(db);
-
-      DEMO_USERS.forEach((u) => {
-        batch.set(doc(usersCol, u.id), u);
-      });
-      DEMO_GROUPS.forEach((g) => {
-        batch.set(doc(groupsCol, g.id), g);
-      });
-      DEMO_EXPENSES.forEach((e) => {
-        batch.set(doc(expensesCol, e.id), e);
-      });
-      DEMO_ACTIVITIES.forEach((a) => {
-        batch.set(doc(activitiesCol, a.id), a);
-      });
-
-      await batch.commit();
-    }
-  } catch (err) {
-    console.warn('Firestore initial check or seed error:', err);
-  }
-}
-
 // Live Subscriptions
-export function subscribeUsers(callback: (users: User[]) => void) {
-  return onSnapshot(usersCol, (snapshot) => {
+export function subscribeUsers(userId: string, friendIds: string[], callback: (users: User[]) => void) {
+  const idsToFetch = Array.from(new Set([userId, ...friendIds])).slice(0, 30); // Firestore 'in' limit is 30
+  const q = idsToFetch.length > 0 ? query(usersCol, where('id', 'in', idsToFetch)) : usersCol;
+  
+  return onSnapshot(q, (snapshot) => {
     const usersList: User[] = [];
     snapshot.forEach((d) => {
       usersList.push(d.data() as User);
@@ -81,8 +67,9 @@ export function subscribeUsers(callback: (users: User[]) => void) {
   });
 }
 
-export function subscribeGroups(callback: (groups: Group[]) => void) {
-  return onSnapshot(groupsCol, (snapshot) => {
+export function subscribeGroups(userId: string, callback: (groups: Group[]) => void) {
+  const q = query(groupsCol, where('members', 'array-contains', userId));
+  return onSnapshot(q, (snapshot) => {
     const groupsList: Group[] = [];
     snapshot.forEach((d) => {
       groupsList.push(d.data() as Group);
@@ -93,8 +80,9 @@ export function subscribeGroups(callback: (groups: Group[]) => void) {
   });
 }
 
-export function subscribeExpenses(callback: (expenses: Expense[]) => void) {
-  return onSnapshot(expensesCol, (snapshot) => {
+export function subscribeExpenses(userId: string, callback: (expenses: Expense[]) => void) {
+  const q = query(expensesCol, where('involvedUserIds', 'array-contains', userId));
+  return onSnapshot(q, (snapshot) => {
     const expensesList: Expense[] = [];
     snapshot.forEach((d) => {
       expensesList.push(d.data() as Expense);
@@ -108,8 +96,11 @@ export function subscribeExpenses(callback: (expenses: Expense[]) => void) {
   });
 }
 
-export function subscribeActivities(callback: (activities: Activity[]) => void) {
-  return onSnapshot(activitiesCol, (snapshot) => {
+export function subscribeActivities(userId: string, callback: (activities: Activity[]) => void) {
+  // To keep it simple, we fetch activities where the user is the creator.
+  // In a full production app, you might also want activities for groups the user is in.
+  const q = query(activitiesCol, where('userId', '==', userId));
+  return onSnapshot(q, (snapshot) => {
     const actList: Activity[] = [];
     snapshot.forEach((d) => {
       actList.push(d.data() as Activity);
@@ -140,6 +131,11 @@ export async function saveGroupToFirestore(group: Group) {
 
 export async function saveExpenseToFirestore(expense: Expense) {
   try {
+    const involved = new Set<string>();
+    involved.add(expense.paidBy);
+    expense.splits.forEach(s => involved.add(s.userId));
+    expense.involvedUserIds = Array.from(involved);
+
     await setDoc(doc(expensesCol, expense.id), expense, { merge: true });
   } catch (e) {
     console.error('Error saving expense to Firestore:', e);
@@ -148,6 +144,11 @@ export async function saveExpenseToFirestore(expense: Expense) {
 
 export async function updateExpenseInFirestore(expense: Expense) {
   try {
+    const involved = new Set<string>();
+    involved.add(expense.paidBy);
+    expense.splits.forEach(s => involved.add(s.userId));
+    expense.involvedUserIds = Array.from(involved);
+
     await setDoc(doc(expensesCol, expense.id), expense, { merge: true });
   } catch (e) {
     console.error('Error updating expense in Firestore:', e);

@@ -4,10 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.tabby.app',
   appName: 'Tabby',
   webDir: 'dist',
-  server: {
-    url: 'https://mytabby.netlify.app/',
-    cleartext: true
-  },
   android: {
     allowMixedContent: true,
     backgroundColor: '#F8F5F2',

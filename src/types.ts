@@ -39,6 +39,7 @@ export interface Expense {
   date: string;
   paidBy: string; // User ID who paid
   groupId: string | null; // null means individual/non-group expense
+  involvedUserIds: string[]; // List of user IDs involved for efficient database querying
   splits: Split[];
   splitMethod: SplitMethod;
   category?: ExpenseCategory;

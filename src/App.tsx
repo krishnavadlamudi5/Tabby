@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Group, Expense, Activity, GroupCategory } from './types';
-import { DEMO_USERS, DEMO_GROUPS, DEMO_EXPENSES, DEMO_ACTIVITIES } from './data/demoData';
+// Demo data imports removed for production
 import Login from './components/Login';
 import DashboardView from './components/DashboardView';
 import GroupView from './components/GroupView';
@@ -18,7 +18,6 @@ import NotificationsView from './components/NotificationsView';
 import AppLogo from './components/AppLogo';
 import { formatAmount } from './utils/currency';
 import {
-  seedInitialFirestoreDataIfEmpty,
   subscribeUsers,
   subscribeGroups,
   subscribeExpenses,
@@ -56,10 +55,10 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // App Master Datastores
-  const [users, setUsers] = useState<User[]>(DEMO_USERS);
-  const [groups, setGroups] = useState<Group[]>(DEMO_GROUPS);
-  const [expenses, setExpenses] = useState<Expense[]>(DEMO_EXPENSES);
-  const [activities, setActivities] = useState<Activity[]>(DEMO_ACTIVITIES);
+  const [users, setUsers] = useState<User[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
 
   // Navigation State
   const [activeView, setActiveView] = useState<
@@ -117,7 +116,7 @@ export default function App() {
   // Sidebar Search Query State
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState('');
 
-  // 1. Mount Phase - Recover states from LocalStorage & Subscribe to Firebase Firestore
+  // 1. Mount Phase - Recover states from LocalStorage
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem('splitwise_user');
@@ -128,27 +127,29 @@ export default function App() {
     } catch (e) {
       console.error('Failed to load local storage Splitwise states', e);
     }
+  }, []);
 
-    // Seed Firestore if empty
-    seedInitialFirestoreDataIfEmpty();
+  // 2. Subscription Phase - Listen to Firebase when user is authenticated
+  useEffect(() => {
+    if (!currentUser) return;
 
-    // Live Firestore Subscriptions
-    const unsubUsers = subscribeUsers((firestoreUsers) => {
+    // Live Firestore Subscriptions (Scoped to current user)
+    const unsubUsers = subscribeUsers(currentUser.id, currentUser.friendIds || [], (firestoreUsers) => {
       setUsers(firestoreUsers);
       localStorage.setItem('splitwise_users', JSON.stringify(firestoreUsers));
     });
 
-    const unsubGroups = subscribeGroups((firestoreGroups) => {
+    const unsubGroups = subscribeGroups(currentUser.id, (firestoreGroups) => {
       setGroups(firestoreGroups);
       localStorage.setItem('splitwise_groups', JSON.stringify(firestoreGroups));
     });
 
-    const unsubExpenses = subscribeExpenses((firestoreExpenses) => {
+    const unsubExpenses = subscribeExpenses(currentUser.id, (firestoreExpenses) => {
       setExpenses(firestoreExpenses);
       localStorage.setItem('splitwise_expenses', JSON.stringify(firestoreExpenses));
     });
 
-    const unsubActivities = subscribeActivities((firestoreActivities) => {
+    const unsubActivities = subscribeActivities(currentUser.id, (firestoreActivities) => {
       setActivities(firestoreActivities);
       localStorage.setItem('splitwise_activities', JSON.stringify(firestoreActivities));
     });
@@ -159,7 +160,7 @@ export default function App() {
       unsubExpenses();
       unsubActivities();
     };
-  }, []);
+  }, [currentUser?.id, JSON.stringify(currentUser?.friendIds)]);
 
   // 2. Action Handlers - Syncing updates to LocalStorage and Firestore
   const handleCurrencyChange = (newCurrency: string) => {
@@ -191,18 +192,12 @@ export default function App() {
     localStorage.removeItem('splitwise_activities');
     localStorage.removeItem('splitwise_currency');
 
-    setUsers(DEMO_USERS);
-    setGroups(DEMO_GROUPS);
-    setExpenses(DEMO_EXPENSES);
-    setActivities(DEMO_ACTIVITIES);
+    setUsers([]);
+    setGroups([]);
+    setExpenses([]);
+    setActivities([]);
     setCurrency('USD');
     setActiveView({ type: 'dashboard' });
-
-    // Seed back to Firestore
-    DEMO_USERS.forEach((u) => saveUserToFirestore(u));
-    DEMO_GROUPS.forEach((g) => saveGroupToFirestore(g));
-    DEMO_EXPENSES.forEach((e) => saveExpenseToFirestore(e));
-    DEMO_ACTIVITIES.forEach((a) => saveActivityToFirestore(a));
   };
 
   const handleLogin = (user: User) => {
@@ -489,6 +484,7 @@ export default function App() {
       paidBy: fromUserId, // The person who owes pays
       groupId,
       splitMethod: 'equally',
+      involvedUserIds: [fromUserId, toUserId],
       isSettlement: true,
       createdBy: currentUser.id,
       createdAt: new Date().toISOString(),

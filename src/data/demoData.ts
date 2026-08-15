@@ -69,6 +69,7 @@ export const DEMO_EXPENSES: Expense[] = [
     isSettlement: false,
     createdBy: 'user-alex',
     createdAt: '2026-08-01T12:05:00Z',
+    involvedUserIds: [],
     splits: [
       { userId: 'user-alex', amount: 500 },
       { userId: 'user-sarah', amount: 500 },
@@ -87,6 +88,7 @@ export const DEMO_EXPENSES: Expense[] = [
     isSettlement: false,
     createdBy: 'user-sarah',
     createdAt: '2026-08-03T15:40:00Z',
+    involvedUserIds: [],
     splits: [
       { userId: 'user-alex', amount: 30 },
       { userId: 'user-sarah', amount: 30 },
@@ -105,6 +107,7 @@ export const DEMO_EXPENSES: Expense[] = [
     isSettlement: false,
     createdBy: 'user-david',
     createdAt: '2026-08-04T18:12:00Z',
+    involvedUserIds: [],
     splits: [
       { userId: 'user-alex', amount: 5 },
       { userId: 'user-sarah', amount: 5 },
@@ -125,6 +128,7 @@ export const DEMO_EXPENSES: Expense[] = [
     isSettlement: false,
     createdBy: 'user-alex',
     createdAt: '2026-08-05T10:00:00Z',
+    involvedUserIds: [],
     splits: [
       { userId: 'user-alex', amount: 200 },
       { userId: 'user-sarah', amount: 200 },
@@ -144,6 +148,7 @@ export const DEMO_EXPENSES: Expense[] = [
     isSettlement: false,
     createdBy: 'user-emily',
     createdAt: '2026-08-06T14:30:00Z',
+    involvedUserIds: [],
     splits: [
       { userId: 'user-alex', amount: 40 },
       { userId: 'user-sarah', amount: 40 },
@@ -163,6 +168,7 @@ export const DEMO_EXPENSES: Expense[] = [
     isSettlement: false,
     createdBy: 'user-ryan',
     createdAt: '2026-08-07T11:15:00Z',
+    involvedUserIds: [],
     splits: [
       { userId: 'user-alex', amount: 10 },
       { userId: 'user-sarah', amount: 10 },
@@ -184,6 +190,7 @@ export const DEMO_EXPENSES: Expense[] = [
     isSettlement: false,
     createdBy: 'user-alex',
     createdAt: '2026-08-08T22:30:00Z',
+    involvedUserIds: [],
     splits: [
       { userId: 'user-alex', amount: 30 },
       { userId: 'user-sarah', amount: 30 },
