@@ -89,6 +89,44 @@ export default function Login({ onLogin }: LoginProps) {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
+  // Initialize Google Identity Services (GIS) One-Tap / ID Token listener if available
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '888676247797-cn7buordb6vqmd7qm6a35u8n6smievcr.apps.googleusercontent.com';
+    if (typeof window !== 'undefined' && window.google?.accounts?.id) {
+      try {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: async (response: any) => {
+            if (response?.credential) {
+              const payload = parseGoogleJwt(response.credential);
+              if (payload && payload.email) {
+                setIsLoading(true);
+                setErrorMsg('');
+                try {
+                  const user = await signInWithGoogle({
+                    email: payload.email,
+                    name: payload.name || payload.email.split('@')[0],
+                    avatar: payload.picture || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
+                    googleId: payload.sub,
+                  });
+                  onLogin(user);
+                } catch (backendErr: any) {
+                  setErrorMsg(backendErr.message || 'Failed to authenticate with Google account.');
+                } finally {
+                  setIsLoading(false);
+                }
+              }
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+      } catch (err) {
+        console.warn('Google One-Tap initialization error:', err);
+      }
+    }
+  }, [onLogin]);
+
   // Password strength calculation
   const getPasswordStrength = (pass: string) => {
     if (!pass) return { score: 0, text: '', color: '' };
@@ -102,6 +140,23 @@ export default function Login({ onLogin }: LoginProps) {
     if (score <= 2) return { score: 2, text: 'Fair', color: 'bg-amber-400' };
     if (score <= 3) return { score: 3, text: 'Good', color: 'bg-blue-400' };
     return { score: 4, text: 'Strong', color: 'bg-emerald-500' };
+  };
+
+  // Helper to safely parse Google ID Token (JWT) without external network calls
+  const parseGoogleJwt = (token: string): any => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch {
+      return null;
+    }
   };
 
   // Real Google OAuth 2.0 Identity Services Trigger
@@ -126,31 +181,55 @@ export default function Login({ onLogin }: LoginProps) {
             }
 
             if (tokenResponse.access_token) {
+              let googleProfile: any = null;
+
+              // Try fetching real profile from Google userinfo endpoints
               try {
-                // Fetch real profile from Google's official userinfo endpoint
                 const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                   headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
                 });
-                const googleProfile = await res.json();
-
-                if (googleProfile && googleProfile.email) {
-                  const user = await signInWithGoogle({
-                    email: googleProfile.email,
-                    name: googleProfile.name || googleProfile.email.split('@')[0],
-                    avatar: googleProfile.picture || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
-                    googleId: googleProfile.sub,
+                if (res.ok) {
+                  googleProfile = await res.json();
+                } else {
+                  // Secondary fallback endpoint
+                  const fallbackRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+                    headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
                   });
-                  onLogin(user);
-                  return;
+                  if (fallbackRes.ok) {
+                    googleProfile = await fallbackRes.json();
+                  }
                 }
               } catch (fetchErr: any) {
-                console.error('Error fetching Google profile:', fetchErr);
-                setErrorMsg('Failed to retrieve user profile from Google.');
+                console.warn('Direct userinfo fetch failed (possibly blocked by ad-blocker):', fetchErr);
+              }
+
+              // If userinfo endpoint could not be reached, open fallback selection modal
+              if (!googleProfile || !googleProfile.email) {
+                setIsLoading(false);
+                setShowGoogleModal(true);
+                return;
+              }
+
+              // Authenticate with Tabby backend
+              try {
+                const user = await signInWithGoogle({
+                  email: googleProfile.email,
+                  name: googleProfile.name || googleProfile.email.split('@')[0],
+                  avatar: googleProfile.picture || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
+                  googleId: googleProfile.sub,
+                });
+                onLogin(user);
+              } catch (backendErr: any) {
+                console.error('Backend Google Sign-In error:', backendErr);
+                setErrorMsg(backendErr.message || 'Failed to sign in with Google. Please check your backend connection.');
               } finally {
                 setIsLoading(false);
               }
+              return;
             }
+
             setIsLoading(false);
+            setShowGoogleModal(true);
           },
         });
 
