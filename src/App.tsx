@@ -26,6 +26,7 @@ import {
   subscribeExpenses,
   subscribeActivities,
 } from './lib/firebase';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
 
 export default function App() {
   const {
@@ -88,9 +89,10 @@ export default function App() {
     groupId: null,
   });
 
-  // Load from local storage
+  // Load from local storage and notify Capgo updater
   useEffect(() => {
     try {
+      CapacitorUpdater.notifyAppReady();
       const savedUser = localStorage.getItem('splitwise_user');
       const savedCurrency = localStorage.getItem('splitwise_currency');
       if (savedUser) setCurrentUser(JSON.parse(savedUser));
