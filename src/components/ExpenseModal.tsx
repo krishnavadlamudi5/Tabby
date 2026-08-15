@@ -6,7 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, Group, Expense, Split, SplitMethod, ExpenseCategory } from '../types';
 import { getCurrencyConfig, formatAmount } from '../utils/currency';
-import { X, Calendar, DollarSign, FileText, Users, ChevronDown, Check, AlertCircle, Tag, Edit3 } from 'lucide-react';
+import { X, Calendar, DollarSign, FileText, Users, ChevronDown, Check, AlertCircle, Tag, Edit3, Camera } from 'lucide-react';
+import ReceiptScanner from './ReceiptScanner';
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -58,6 +59,7 @@ export default function ExpenseModal({
   const [customInputs, setCustomInputs] = useState<Record<string, string>>({});
 
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
 
   // Update eligible users when Group selection or Friend selection changes
   useEffect(() => {
@@ -269,6 +271,17 @@ export default function ExpenseModal({
           </div>
 
           <div className="flex items-center gap-2" id="header-action-group">
+            {!isEditing && (
+              <button
+                onClick={() => setShowScanner(!showScanner)}
+                type="button"
+                className="px-3.5 py-1.5 bg-[#EBF1ED] hover:bg-[#FAF8F5] text-[#3C5A48] font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Scan Receipt with AI"
+              >
+                <Camera className="w-4 h-4" />
+                <span className="hidden sm:inline">AI Scan</span>
+              </button>
+            )}
             <button
               onClick={handleSubmit}
               type="button"
@@ -291,7 +304,19 @@ export default function ExpenseModal({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 sm:gap-5">
+        {showScanner ? (
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex items-center justify-center">
+            <ReceiptScanner 
+              onScanComplete={(items, total, tax) => {
+                setDescription(`Receipt: ${items.length} items`);
+                setAmountStr(total.toString());
+                setShowScanner(false);
+              }}
+              onCancel={() => setShowScanner(false)}
+            />
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-4 sm:gap-5">
           {/* Category Dropdown */}
           <div className="flex flex-col gap-1.5" id="category-selector-container">
             <label htmlFor="expense-category" className="text-xs font-bold text-[#2C2B29] flex items-center gap-1">
@@ -668,7 +693,8 @@ export default function ExpenseModal({
               <span>{validationError}</span>
             </div>
           )}
-        </form>
+          </form>
+        )}
       </div>
     </div>
   );

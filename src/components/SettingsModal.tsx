@@ -6,7 +6,8 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { SUPPORTED_CURRENCIES, formatAmount, getCurrencyConfig } from '../utils/currency';
-import { X, Settings, DollarSign, User as UserIcon, RotateCcw, Check, Sparkles, Globe, Shield } from 'lucide-react';
+import { exportExpensesToCSV } from '../utils/export';
+import { X, Settings, DollarSign, User as UserIcon, RotateCcw, Check, Sparkles, Globe, Shield, Download } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -16,6 +17,9 @@ interface SettingsModalProps {
   onCurrencyChange: (newCurrencyCode: string) => void;
   onUpdateProfile: (updatedUser: Partial<User>) => void;
   onResetData: () => void;
+  expenses?: any[];
+  groups?: any[];
+  allUsers?: any[];
 }
 
 export default function SettingsModal({
@@ -26,6 +30,9 @@ export default function SettingsModal({
   onCurrencyChange,
   onUpdateProfile,
   onResetData,
+  expenses = [],
+  groups = [],
+  allUsers = [],
 }: SettingsModalProps) {
   const [selectedCurrency, setSelectedCurrency] = useState(currency);
   const [userName, setUserName] = useState(currentUser.name);
@@ -142,6 +149,27 @@ export default function SettingsModal({
                 <span className="text-[#C86D51]">{formatAmount(-65.00, selectedCurrency, true)}</span>
               </div>
             </div>
+          </div>
+
+          <div className="border-t border-[#E6E1DA]" />
+
+          {/* SECTION 1.5: Data Export */}
+          <div className="flex flex-col gap-3">
+            <label className="text-xs font-bold text-[#2C2B29] uppercase tracking-wider flex items-center gap-1.5">
+              <Download className="w-3.5 h-3.5 text-[#3C5A48]" />
+              Export Data
+            </label>
+            <p className="text-xs text-[#736F6A]">
+              Download a complete CSV backup of all your expenses, splits, and history.
+            </p>
+            <button
+              type="button"
+              onClick={() => exportExpensesToCSV(expenses, groups, allUsers, currency)}
+              className="px-4 py-2 bg-white border border-[#E6E1DA] hover:bg-[#FAF8F5] text-[#2C2B29] font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Download CSV Report
+            </button>
           </div>
 
           <div className="border-t border-[#E6E1DA]" />

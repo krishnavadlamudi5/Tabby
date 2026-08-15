@@ -171,10 +171,90 @@ export async function saveActivityToFirestore(activity: Activity) {
   }
 }
 
+async function linkGhostUser(newUid: string, email: string, phone?: string) {
+  try {
+    let ghostUser: User | null = null;
+    let ghostDocRef = null;
+
+    if (email) {
+      const q = query(usersCol, where('email', '==', email));
+      const snaps = await getDocs(q);
+      snaps.forEach(docSnap => {
+        if (docSnap.id.startsWith('user-')) {
+          ghostUser = docSnap.data() as User;
+          ghostDocRef = docSnap.ref;
+        }
+      });
+    }
+
+    if (!ghostUser && phone) {
+      const q = query(usersCol, where('phone', '==', phone));
+      const snaps = await getDocs(q);
+      snaps.forEach(docSnap => {
+        if (docSnap.id.startsWith('user-')) {
+          ghostUser = docSnap.data() as User;
+          ghostDocRef = docSnap.ref;
+        }
+      });
+    }
+
+    if (!ghostUser) return;
+    
+    const ghostId = ghostUser.id;
+    const batch = writeBatch(db);
+
+    const friendsQ = query(usersCol, where('friendIds', 'array-contains', ghostId));
+    const friendsSnap = await getDocs(friendsQ);
+    friendsSnap.forEach(docSnap => {
+      const u = docSnap.data() as User;
+      const newFriendIds = (u.friendIds || []).map(id => id === ghostId ? newUid : id);
+      batch.update(docSnap.ref, { friendIds: newFriendIds });
+    });
+
+    const groupsQ = query(groupsCol, where('members', 'array-contains', ghostId));
+    const groupsSnap = await getDocs(groupsQ);
+    groupsSnap.forEach(docSnap => {
+      const g = docSnap.data() as Group;
+      const newMembers = (g.members || []).map(id => id === ghostId ? newUid : id);
+      batch.update(docSnap.ref, { members: newMembers });
+    });
+
+    const expQ = query(expensesCol, where('involvedUserIds', 'array-contains', ghostId));
+    const expSnap = await getDocs(expQ);
+    expSnap.forEach(docSnap => {
+      const e = docSnap.data() as Expense;
+      const updatedExp = { ...e };
+      if (updatedExp.paidBy === ghostId) updatedExp.paidBy = newUid;
+      if (updatedExp.createdBy === ghostId) updatedExp.createdBy = newUid;
+      updatedExp.involvedUserIds = (updatedExp.involvedUserIds || []).map(id => id === ghostId ? newUid : id);
+      updatedExp.splits = (updatedExp.splits || []).map(s => s.userId === ghostId ? { ...s, userId: newUid } : s);
+      batch.update(docSnap.ref, updatedExp);
+    });
+
+    const actQ = query(activitiesCol, where('userId', '==', ghostId));
+    const actSnap = await getDocs(actQ);
+    actSnap.forEach(docSnap => {
+      batch.update(docSnap.ref, { userId: newUid });
+    });
+
+    if (ghostDocRef) {
+      batch.delete(ghostDocRef);
+    }
+
+    await batch.commit();
+    console.log(`Ghost user ${ghostId} linked to real user ${newUid}`);
+  } catch (error) {
+    console.error('Error linking ghost user:', error);
+  }
+}
+
 // Authentication Functions
 export async function signInWithGoogle(): Promise<User> {
   const result = await signInWithPopup(auth, googleProvider);
   const fbUser = result.user;
+  
+  await linkGhostUser(fbUser.uid, fbUser.email || '');
+  
   const user: User = {
     id: fbUser.uid,
     name: fbUser.displayName || 'Google User',
@@ -200,6 +280,9 @@ export async function signInWithEmail(emailVal: string, passwordVal: string): Pr
 export async function registerWithEmail(nameVal: string, emailVal: string, phoneVal: string, passwordVal: string): Promise<User> {
   const result = await createUserWithEmailAndPassword(auth, emailVal, passwordVal);
   const fbUser = result.user;
+
+  await linkGhostUser(fbUser.uid, emailVal, phoneVal);
+
   const user: User = {
     id: fbUser.uid,
     name: nameVal,

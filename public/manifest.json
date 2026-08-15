@@ -1,21 +1,27 @@
 {
-  "short_name": "Splitwise",
-  "name": "Splitwise Expense Splitter",
+  "short_name": "Tabby",
+  "name": "Tabby - Split Expenses",
   "icons": [
     {
-      "src": "pwa-192.png",
-      "type": "image/png",
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
       "sizes": "192x192"
     },
     {
-      "src": "pwa-512.png",
-      "type": "image/png",
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
       "sizes": "512x512"
     }
   ],
   "start_url": "/",
   "background_color": "#FAF8F5",
-  "theme_color": "#3C5A48",
+  "theme_color": "#00876C",
   "display": "standalone",
   "orientation": "portrait"
 }
