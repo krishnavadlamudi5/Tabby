@@ -1,11 +1,9 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+import { User } from './models/User';
+import { Group } from './models/Group';
+import { Expense } from './models/Expense';
+import { Activity } from './models/Activity';
 
-import { User, Group, Expense, Activity } from '../types';
-
-export const DEMO_USERS: User[] = [
+export const DEMO_USERS_SEED = [
   {
     id: 'user-alex',
     name: 'Alex Morgan',
@@ -13,6 +11,7 @@ export const DEMO_USERS: User[] = [
     phone: '+15550199',
     avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
     friendIds: ['user-sarah', 'user-david', 'user-emily', 'user-ryan'],
+    createdAt: '2026-08-01T10:00:00Z',
   },
   {
     id: 'user-sarah',
@@ -21,6 +20,7 @@ export const DEMO_USERS: User[] = [
     phone: '+15550288',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
     friendIds: ['user-alex', 'user-david', 'user-emily', 'user-ryan'],
+    createdAt: '2026-08-01T10:05:00Z',
   },
   {
     id: 'user-david',
@@ -29,6 +29,7 @@ export const DEMO_USERS: User[] = [
     phone: '+15550377',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80',
     friendIds: ['user-alex', 'user-sarah'],
+    createdAt: '2026-08-01T10:10:00Z',
   },
   {
     id: 'user-emily',
@@ -37,6 +38,7 @@ export const DEMO_USERS: User[] = [
     phone: '+15550466',
     avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&h=150&q=80',
     friendIds: ['user-alex', 'user-sarah', 'user-ryan'],
+    createdAt: '2026-08-01T10:15:00Z',
   },
   {
     id: 'user-ryan',
@@ -45,10 +47,11 @@ export const DEMO_USERS: User[] = [
     phone: '+15550555',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80',
     friendIds: ['user-alex', 'user-sarah', 'user-emily'],
+    createdAt: '2026-08-01T10:20:00Z',
   },
 ];
 
-export const DEMO_GROUPS: Group[] = [
+export const DEMO_GROUPS_SEED = [
   {
     id: 'group-apt',
     name: 'Apartment 4B',
@@ -72,7 +75,7 @@ export const DEMO_GROUPS: Group[] = [
   },
 ];
 
-export const DEMO_EXPENSES: Expense[] = [
+export const DEMO_EXPENSES_SEED = [
   // --- Group: Apartment 4B ---
   {
     id: 'exp-1',
@@ -333,7 +336,7 @@ export const DEMO_EXPENSES: Expense[] = [
   },
 ];
 
-export const DEMO_ACTIVITIES: Activity[] = [
+export const DEMO_ACTIVITIES_SEED = [
   {
     id: 'act-1',
     type: 'group_create',
@@ -448,20 +451,48 @@ export const DEMO_ACTIVITIES: Activity[] = [
   },
 ];
 
-export const DEMO_USER_IDS = new Set(DEMO_USERS.map((u) => u.id));
+export async function seedDemoData(): Promise<void> {
+  try {
+    console.log('🌱 Checking / Seeding Demo Data in MongoDB...');
 
-export function isDemoUser(userId?: string | null): boolean {
-  if (!userId) return false;
-  return DEMO_USER_IDS.has(userId) || userId === 'user-alex' || userId === 'user-sarah';
-}
+    // 1. Seed Users
+    for (const u of DEMO_USERS_SEED) {
+      await User.findOneAndUpdate(
+        { id: u.id },
+        { $set: u },
+        { upsert: true, new: true }
+      );
+    }
 
-export function getDemoInitialData(userId: string) {
-  const user = DEMO_USERS.find((u) => u.id === userId) || DEMO_USERS[0];
-  return {
-    currentUser: user,
-    users: [...DEMO_USERS],
-    groups: [...DEMO_GROUPS],
-    expenses: [...DEMO_EXPENSES],
-    activities: [...DEMO_ACTIVITIES],
-  };
+    // 2. Seed Groups
+    for (const g of DEMO_GROUPS_SEED) {
+      await Group.findOneAndUpdate(
+        { id: g.id },
+        { $set: g },
+        { upsert: true, new: true }
+      );
+    }
+
+    // 3. Seed Expenses
+    for (const e of DEMO_EXPENSES_SEED) {
+      await Expense.findOneAndUpdate(
+        { id: e.id },
+        { $set: e },
+        { upsert: true, new: true }
+      );
+    }
+
+    // 4. Seed Activities
+    for (const a of DEMO_ACTIVITIES_SEED) {
+      await Activity.findOneAndUpdate(
+        { id: a.id },
+        { $set: a },
+        { upsert: true, new: true }
+      );
+    }
+
+    console.log('✅ Demo Data verified & successfully populated in MongoDB.');
+  } catch (error) {
+    console.error('Error seeding demo data:', error);
+  }
 }

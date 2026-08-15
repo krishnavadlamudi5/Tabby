@@ -20,12 +20,6 @@ import MobileHeader from './components/layout/MobileHeader';
 import { Grid, Users, UserPlus, Bell, Plus, Sparkles, X } from 'lucide-react';
 import { useAppStore } from './store/useAppStore';
 import { User, Expense } from './types';
-import {
-  subscribeUsers,
-  subscribeGroups,
-  subscribeExpenses,
-  subscribeActivities,
-} from './lib/firebase';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 
 export default function App() {
@@ -36,7 +30,9 @@ export default function App() {
     expenses,
     activities,
     currency,
+    initStore,
     login,
+    syncWithBackend,
     setCurrentUser,
     setUsers,
     setGroups,
@@ -93,30 +89,23 @@ export default function App() {
   useEffect(() => {
     try {
       CapacitorUpdater.notifyAppReady();
-      const savedUser = localStorage.getItem('splitwise_user');
-      const savedCurrency = localStorage.getItem('splitwise_currency');
-      if (savedUser) setCurrentUser(JSON.parse(savedUser));
-      if (savedCurrency) setCurrency(savedCurrency);
+      initStore();
     } catch (e) {
-      console.error('Failed to load local storage Splitwise states', e);
+      console.error('Failed to initialize app state', e);
     }
   }, []);
 
-  // Firebase Subscriptions
+  // MongoDB Data Sync
   useEffect(() => {
-    if (!currentUser) return;
-    const unsubUsers = subscribeUsers(currentUser.id, currentUser.friendIds || [], setUsers);
-    const unsubGroups = subscribeGroups(currentUser.id, setGroups);
-    const unsubExpenses = subscribeExpenses(currentUser.id, setExpenses);
-    const unsubActivities = subscribeActivities(currentUser.id, setActivities);
+    if (!currentUser?.id) return;
+    syncWithBackend(currentUser.id);
 
-    return () => {
-      unsubUsers();
-      unsubGroups();
-      unsubExpenses();
-      unsubActivities();
-    };
-  }, [currentUser?.id, JSON.stringify(currentUser?.friendIds)]);
+    const interval = setInterval(() => {
+      syncWithBackend(currentUser.id);
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [currentUser?.id]);
 
   // Selectors
   const myGroups = useMemo(() => {
