@@ -146,7 +146,7 @@ export default function Sidebar({
             <Bell className="w-4 h-4" />
             <span className="flex-1 text-left">Notifications</span>
             {activities.length > 0 && (
-              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${activeView.type === 'notifications' ? 'bg-white text-[#3C5A48]' : 'bg-[#EBF1ED] text-[#3C5A48]'}`}>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activeView.type === 'notifications' ? 'bg-white text-[#3C5A48]' : 'bg-[#EBF1ED] text-[#3C5A48]'}`}>
                 {activities.length}
               </span>
             )}
