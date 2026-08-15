@@ -6,20 +6,24 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     url: 'https://mytabby.netlify.app/',
-    cleartext: true
+    cleartext: true,
+    androidScheme: 'https'
   },
   android: {
     allowMixedContent: true,
-    backgroundColor: '#F8F5F2',
+    backgroundColor: '#FAF8F5',
     captureInput: true
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 1500,
+      launchShowDuration: 4000,
       launchAutoHide: true,
-      backgroundColor: '#F8F5F2',
+      backgroundColor: '#FAF8F5',
       androidScaleType: 'CENTER_CROP',
-      showSpinner: false
+      showSpinner: true,
+      spinnerColor: '#3C5A48',
+      splashFullScreen: true,
+      splashImmersive: true
     },
     StatusBar: {
       style: 'DARK',
@@ -29,12 +33,8 @@ const config: CapacitorConfig = {
     Keyboard: {
       resize: 'body',
       style: 'DARK'
-    },
-    CapacitorUpdater: {
-      autoUpdate: true
     }
   }
 };
 
 export default config;
-

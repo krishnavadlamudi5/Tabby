@@ -20,7 +20,7 @@ import MobileHeader from './components/layout/MobileHeader';
 import { Grid, Users, UserPlus, Bell, Plus, Sparkles, X } from 'lucide-react';
 import { useAppStore } from './store/useAppStore';
 import { User, Expense } from './types';
-import { CapacitorUpdater } from '@capgo/capacitor-updater';
+import { SplashScreen } from '@capacitor/splash-screen';
 
 export default function App() {
   const {
@@ -85,11 +85,12 @@ export default function App() {
     groupId: null,
   });
 
-  // Load from local storage and notify Capgo updater
+  // Load from local storage and dismiss native splash screen
   useEffect(() => {
     try {
-      CapacitorUpdater.notifyAppReady();
       initStore();
+      // Smoothly hide native splash once app is ready
+      SplashScreen.hide().catch(() => {});
     } catch (e) {
       console.error('Failed to initialize app state', e);
     }
