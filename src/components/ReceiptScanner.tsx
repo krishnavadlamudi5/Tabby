@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Upload, Loader2, Receipt, CheckCircle, AlertCircle } from 'lucide-react';
+import { Camera, Upload, Loader2, Receipt, CheckCircle, AlertCircle, Sparkles } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 
