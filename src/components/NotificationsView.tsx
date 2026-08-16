@@ -29,6 +29,9 @@ interface NotificationsViewProps {
   onNavigateToGroup?: (groupId: string) => void;
   onNavigateToFriend?: (friendId: string) => void;
   onSimulateAppUpdate?: () => void;
+  onApplyLiveUpdate?: () => void;
+  isDownloadingUpdate?: boolean;
+  liveLatestVersion?: string | null;
 }
 
 export default function NotificationsView({
@@ -39,6 +42,9 @@ export default function NotificationsView({
   onNavigateToGroup,
   onNavigateToFriend,
   onSimulateAppUpdate,
+  onApplyLiveUpdate,
+  isDownloadingUpdate,
+  liveLatestVersion,
 }: NotificationsViewProps) {
   const [filter, setFilter] = useState<'all' | 'expense' | 'settlement' | 'system'>('all');
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
@@ -248,15 +254,22 @@ export default function NotificationsView({
                     {act.type === 'app_update' && (
                       <div className="mt-2.5 p-3 bg-[#FAF8F5] border border-[#E6E1DA] rounded-xl flex items-center justify-between">
                         <div className="flex items-center gap-2 text-xs text-[#3C5A48] font-bold">
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin-slow" />
-                          Tabby v1.2 Release Installed
+                          <RefreshCw className={`w-3.5 h-3.5 ${isDownloadingUpdate ? 'animate-spin' : 'animate-spin-slow'}`} />
+                          {liveLatestVersion ? `Tabby ${liveLatestVersion} Available` : 'Tabby System Update'}
                         </div>
                         <button
                           type="button"
-                          onClick={() => window.location.reload()}
-                          className="px-2.5 py-1 bg-[#3C5A48] hover:bg-[#2E4738] text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer"
+                          disabled={isDownloadingUpdate}
+                          onClick={() => {
+                            if (onApplyLiveUpdate) {
+                              onApplyLiveUpdate();
+                            } else {
+                              window.location.reload();
+                            }
+                          }}
+                          className="px-2.5 py-1 bg-[#3C5A48] hover:bg-[#2E4738] disabled:opacity-50 text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
                         >
-                          Reload App
+                          {isDownloadingUpdate ? 'Downloading...' : 'Update & Reload'}
                         </button>
                       </div>
                     )}

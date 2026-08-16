@@ -79,6 +79,7 @@ export default function Login({ onLogin }: LoginProps) {
   const [showGoogleModal, setShowGoogleModal] = useState<boolean>(false);
   const [googleEmail, setGoogleEmail] = useState<string>('');
   const [googleName, setGoogleName] = useState<string>('');
+  const [googleModalError, setGoogleModalError] = useState<string>('');
 
   const fullPhone = `${countryCode}${phoneNumber.trim()}`;
 
@@ -88,59 +89,6 @@ export default function Login({ onLogin }: LoginProps) {
     const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
     return () => clearTimeout(timer);
   }, [resendCooldown]);
-
-  // Initialize Google Identity Services (GIS) One-Tap / ID Token listener if available
-  useEffect(() => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '888676247797-cn7buordb6vqmd7qm6a35u8n6smievcr.apps.googleusercontent.com';
-    if (typeof window !== 'undefined' && window.google?.accounts?.id) {
-      try {
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: async (response: any) => {
-            if (response?.credential) {
-              const payload = parseGoogleJwt(response.credential);
-              if (payload && payload.email) {
-                setIsLoading(true);
-                setErrorMsg('');
-                try {
-                  const user = await signInWithGoogle({
-                    email: payload.email,
-                    name: payload.name || payload.email.split('@')[0],
-                    avatar: payload.picture || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
-                    googleId: payload.sub,
-                  });
-                  onLogin(user);
-                } catch (backendErr: any) {
-                  setErrorMsg(backendErr.message || 'Failed to authenticate with Google account.');
-                } finally {
-                  setIsLoading(false);
-                }
-              }
-            }
-          },
-          auto_select: false,
-          cancel_on_tap_outside: true,
-        });
-      } catch (err) {
-        console.warn('Google One-Tap initialization error:', err);
-      }
-    }
-  }, [onLogin]);
-
-  // Password strength calculation
-  const getPasswordStrength = (pass: string) => {
-    if (!pass) return { score: 0, text: '', color: '' };
-    let score = 0;
-    if (pass.length >= 6) score += 1;
-    if (pass.length >= 8) score += 1;
-    if (/[A-Z]/.test(pass) || /[0-9]/.test(pass)) score += 1;
-    if (/[^A-Za-z0-9]/.test(pass)) score += 1;
-
-    if (score <= 1) return { score: 1, text: 'Weak', color: 'bg-red-400' };
-    if (score <= 2) return { score: 2, text: 'Fair', color: 'bg-amber-400' };
-    if (score <= 3) return { score: 3, text: 'Good', color: 'bg-blue-400' };
-    return { score: 4, text: 'Strong', color: 'bg-emerald-500' };
-  };
 
   // Helper to safely parse Google ID Token (JWT) without external network calls
   const parseGoogleJwt = (token: string): any => {
@@ -159,14 +107,85 @@ export default function Login({ onLogin }: LoginProps) {
     }
   };
 
-  // Real Google OAuth 2.0 Identity Services Trigger
-  const handleGoogleSignIn = () => {
-    setErrorMsg('');
-    setIsLoading(true);
-
+  // Initialize Google Identity Services (GIS)
+  useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '888676247797-cn7buordb6vqmd7qm6a35u8n6smievcr.apps.googleusercontent.com';
 
-    // 1. If official Google GIS SDK is loaded on page, open real Google account picker popup
+    const initGis = () => {
+      if (typeof window !== 'undefined' && window.google?.accounts?.id) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: async (response: any) => {
+              if (response?.credential) {
+                const payload = parseGoogleJwt(response.credential);
+                if (payload && payload.email) {
+                  setIsLoading(true);
+                  setErrorMsg('');
+                  try {
+                    const user = await signInWithGoogle({
+                      email: payload.email,
+                      name: payload.name || payload.email.split('@')[0],
+                      avatar: payload.picture || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
+                      googleId: payload.sub,
+                    });
+                    onLogin(user);
+                  } catch (backendErr: any) {
+                    console.error('GIS callback login error:', backendErr);
+                    setErrorMsg(backendErr.message || 'Failed to authenticate with Google account.');
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }
+              }
+            },
+            auto_select: false,
+            cancel_on_tap_outside: true,
+          });
+        } catch (err) {
+          console.warn('Google One-Tap initialization error:', err);
+        }
+      }
+    };
+
+    initGis();
+
+    // Script load listener
+    const scriptTag = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
+    if (scriptTag) {
+      scriptTag.addEventListener('load', initGis);
+    }
+
+    // Interval check in case script finished asynchronously
+    const timer = setInterval(() => {
+      if (window.google?.accounts?.id) {
+        initGis();
+        clearInterval(timer);
+      }
+    }, 800);
+
+    return () => {
+      clearInterval(timer);
+      if (scriptTag) scriptTag.removeEventListener('load', initGis);
+    };
+  }, [onLogin]);
+
+  // Password strength calculation
+  const getPasswordStrength = (pass: string) => {
+    if (!pass) return { score: 0, text: '', color: '' };
+    let score = 0;
+    if (pass.length >= 6) score += 1;
+    if (pass.length >= 8) score += 1;
+    if (/[A-Z]/.test(pass) || /[0-9]/.test(pass)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pass)) score += 1;
+
+    if (score <= 1) return { score: 1, text: 'Weak', color: 'bg-red-400' };
+    if (score <= 2) return { score: 2, text: 'Fair', color: 'bg-amber-400' };
+    if (score <= 3) return { score: 3, text: 'Good', color: 'bg-blue-400' };
+    return { score: 4, text: 'Strong', color: 'bg-emerald-500' };
+  };
+
+  const tryOAuthClient = (clientId: string) => {
     if (typeof window !== 'undefined' && window.google?.accounts?.oauth2) {
       try {
         const tokenClient = window.google.accounts.oauth2.initTokenClient({
@@ -176,6 +195,7 @@ export default function Login({ onLogin }: LoginProps) {
             if (tokenResponse.error) {
               console.warn('Google OAuth origin mismatch or error:', tokenResponse);
               setIsLoading(false);
+              setGoogleModalError('');
               setShowGoogleModal(true);
               return;
             }
@@ -191,7 +211,6 @@ export default function Login({ onLogin }: LoginProps) {
                 if (res.ok) {
                   googleProfile = await res.json();
                 } else {
-                  // Secondary fallback endpoint
                   const fallbackRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
                     headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
                   });
@@ -200,28 +219,34 @@ export default function Login({ onLogin }: LoginProps) {
                   }
                 }
               } catch (fetchErr: any) {
-                console.warn('Direct userinfo fetch failed (possibly blocked by ad-blocker):', fetchErr);
+                console.warn('Direct userinfo fetch failed (network or extension blocked):', fetchErr);
               }
 
+              const userEmail = googleProfile?.email || '';
+              const userName = googleProfile?.name || (userEmail ? userEmail.split('@')[0] : 'Google User');
+              const userAvatar = googleProfile?.picture || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`;
+              const googleId = googleProfile?.sub;
+
               // If userinfo endpoint could not be reached, open fallback selection modal
-              if (!googleProfile || !googleProfile.email) {
+              if (!userEmail) {
                 setIsLoading(false);
+                setGoogleModalError('');
                 setShowGoogleModal(true);
                 return;
               }
 
-              // Authenticate with Tabby backend
+              // Authenticate with Tabby
               try {
                 const user = await signInWithGoogle({
-                  email: googleProfile.email,
-                  name: googleProfile.name || googleProfile.email.split('@')[0],
-                  avatar: googleProfile.picture || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
-                  googleId: googleProfile.sub,
+                  email: userEmail,
+                  name: userName,
+                  avatar: userAvatar,
+                  googleId,
                 });
                 onLogin(user);
               } catch (backendErr: any) {
                 console.error('Backend Google Sign-In error:', backendErr);
-                setErrorMsg(backendErr.message || 'Failed to sign in with Google. Please check your backend connection.');
+                setErrorMsg(backendErr.message || 'Failed to sign in with Google account.');
               } finally {
                 setIsLoading(false);
               }
@@ -229,8 +254,15 @@ export default function Login({ onLogin }: LoginProps) {
             }
 
             setIsLoading(false);
+            setGoogleModalError('');
             setShowGoogleModal(true);
           },
+          error_callback: (nonOAuthErr: any) => {
+            console.warn('Google OAuth error callback:', nonOAuthErr);
+            setIsLoading(false);
+            setGoogleModalError('');
+            setShowGoogleModal(true);
+          }
         });
 
         tokenClient.requestAccessToken({ prompt: 'select_account' });
@@ -240,22 +272,68 @@ export default function Login({ onLogin }: LoginProps) {
       }
     }
 
-    // 2. Fallback if GIS is blocked by extensions or offline:
     setIsLoading(false);
+    setGoogleModalError('');
+    setShowGoogleModal(true);
+  };
+
+  // Trigger Google Sign In Flow
+  const handleGoogleSignIn = () => {
+    setErrorMsg('');
+    setGoogleModalError('');
+    setIsLoading(true);
+
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '888676247797-cn7buordb6vqmd7qm6a35u8n6smievcr.apps.googleusercontent.com';
+
+    // 1. Try Google Identity Services One-Tap prompt if ready
+    if (typeof window !== 'undefined' && window.google?.accounts) {
+      if (window.google.accounts.id) {
+        try {
+          window.google.accounts.id.prompt((notification: any) => {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+              console.log('Google One-Tap skipped or not displayed, launching OAuth popup...');
+              tryOAuthClient(clientId);
+            }
+          });
+          // Also launch OAuth client after a short pause if prompt doesn't open
+          setTimeout(() => {
+            if (isLoading) {
+              tryOAuthClient(clientId);
+            }
+          }, 600);
+          return;
+        } catch (e) {
+          console.warn('One-Tap prompt error:', e);
+        }
+      }
+
+      // 2. Launch OAuth Token client
+      tryOAuthClient(clientId);
+      return;
+    }
+
+    // 3. Fallback if GIS is blocked or offline:
+    setIsLoading(false);
+    setGoogleModalError('');
     setShowGoogleModal(true);
   };
 
   const handleGoogleSubmit = async (customEmail?: string, customName?: string) => {
     setErrorMsg('');
-    const emailToUse = customEmail || googleEmail.trim();
+    setGoogleModalError('');
+    const emailToUse = (customEmail || googleEmail).trim();
     if (!emailToUse) {
-      setErrorMsg('Please enter your Google email address.');
+      setGoogleModalError('Please enter a valid Google email address.');
+      return;
+    }
+    if (!emailToUse.includes('@')) {
+      setGoogleModalError('Please enter a valid email address containing @.');
       return;
     }
 
     setIsLoading(true);
     try {
-      const nameToUse = customName || googleName.trim() || emailToUse.split('@')[0];
+      const nameToUse = (customName || googleName).trim() || emailToUse.split('@')[0];
       const avatarToUse = `https://images.unsplash.com/photo-${1535713875002 + Math.floor(Math.random() * 1000)}?auto=format&fit=crop&w=150&h=150&q=80`;
 
       const user = await signInWithGoogle({
@@ -268,7 +346,7 @@ export default function Login({ onLogin }: LoginProps) {
       onLogin(user);
     } catch (err: any) {
       console.error('Google Sign In Error:', err);
-      setErrorMsg(err.message || 'Failed to sign in with Google.');
+      setGoogleModalError(err.message || 'Failed to sign in with Google.');
     } finally {
       setIsLoading(false);
     }
@@ -937,7 +1015,7 @@ export default function Login({ onLogin }: LoginProps) {
       {/* ========================================================= */}
       {showGoogleModal && (
         <div className="fixed inset-0 z-50 bg-[#2C2B29]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm border border-[#E6E1DA] shadow-2xl flex flex-col gap-5">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm border border-[#E6E1DA] shadow-2xl flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24">
@@ -949,23 +1027,35 @@ export default function Login({ onLogin }: LoginProps) {
                 <span className="font-extrabold text-sm text-[#2C2B29]">Sign in with Google</span>
               </div>
               <button 
-                onClick={() => setShowGoogleModal(false)}
-                className="text-[#736F6A] hover:text-[#2C2B29] text-xs font-bold cursor-pointer"
+                onClick={() => {
+                  setShowGoogleModal(false);
+                  setGoogleModalError('');
+                }}
+                className="text-[#736F6A] hover:text-[#2C2B29] text-xs font-bold cursor-pointer p-1"
               >
                 ✕
               </button>
             </div>
 
             <p className="text-xs text-[#736F6A] leading-relaxed">
-              Choose an active Google profile or enter your Google email to sign in directly to MongoDB.
+              Select a quick Google profile or enter your Google email address to sign in instantly.
             </p>
+
+            {/* In-Modal Error Display */}
+            {googleModalError && (
+              <div className="p-2.5 text-xs bg-red-50 text-red-700 border border-red-200 rounded-xl font-semibold flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+                <span>{googleModalError}</span>
+              </div>
+            )}
 
             {/* Quick 1-tap profiles */}
             <div className="flex flex-col gap-2">
               <button
                 type="button"
+                disabled={isLoading}
                 onClick={() => handleGoogleSubmit('alex.split@gmail.com', 'Alex Morgan')}
-                className="flex items-center gap-3 p-2.5 rounded-2xl border border-[#E6E1DA] hover:border-[#3C5A48] hover:bg-[#FAF8F5] transition-all text-left cursor-pointer"
+                className="flex items-center gap-3 p-2.5 rounded-2xl border border-[#E6E1DA] hover:border-[#3C5A48] hover:bg-[#FAF8F5] transition-all text-left cursor-pointer disabled:opacity-60"
               >
                 <img 
                   src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80" 
@@ -973,15 +1063,16 @@ export default function Login({ onLogin }: LoginProps) {
                   className="w-9 h-9 rounded-full object-cover border border-[#E6E1DA]"
                 />
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-[#2C2B29]">Alex Morgan (Demo)</p>
+                  <p className="text-xs font-bold text-[#2C2B29]">Alex Morgan</p>
                   <p className="text-[10px] text-[#736F6A] truncate">alex.split@gmail.com</p>
                 </div>
               </button>
 
               <button
                 type="button"
+                disabled={isLoading}
                 onClick={() => handleGoogleSubmit('sarah.c@gmail.com', 'Sarah Chen')}
-                className="flex items-center gap-3 p-2.5 rounded-2xl border border-[#E6E1DA] hover:border-[#3C5A48] hover:bg-[#FAF8F5] transition-all text-left cursor-pointer"
+                className="flex items-center gap-3 p-2.5 rounded-2xl border border-[#E6E1DA] hover:border-[#3C5A48] hover:bg-[#FAF8F5] transition-all text-left cursor-pointer disabled:opacity-60"
               >
                 <img 
                   src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80" 
@@ -989,7 +1080,7 @@ export default function Login({ onLogin }: LoginProps) {
                   className="w-9 h-9 rounded-full object-cover border border-[#E6E1DA]"
                 />
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-[#2C2B29]">Sarah Chen (Demo)</p>
+                  <p className="text-xs font-bold text-[#2C2B29]">Sarah Chen</p>
                   <p className="text-[10px] text-[#736F6A] truncate">sarah.c@gmail.com</p>
                 </div>
               </button>
@@ -997,33 +1088,41 @@ export default function Login({ onLogin }: LoginProps) {
 
             <div className="relative flex py-0.5 items-center">
               <div className="flex-grow border-t border-[#E6E1DA]"></div>
-              <span className="flex-shrink mx-2 text-[10px] font-bold text-[#736F6A] uppercase">or enter custom email</span>
+              <span className="flex-shrink mx-2 text-[10px] font-bold text-[#736F6A] uppercase">or enter your email</span>
               <div className="flex-grow border-t border-[#E6E1DA]"></div>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <form onSubmit={(e) => { e.preventDefault(); handleGoogleSubmit(); }} className="flex flex-col gap-2">
               <input
                 type="email"
                 placeholder="your.email@gmail.com"
                 value={googleEmail}
                 onChange={(e) => setGoogleEmail(e.target.value)}
-                className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-xs focus:outline-none focus:border-[#3C5A48] bg-[#FAF8F5]/40"
+                required
+                className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-xs focus:outline-none focus:border-[#3C5A48] bg-[#FAF8F5]/40 text-[#2C2B29]"
               />
               <input
                 type="text"
                 placeholder="Your Full Name (Optional)"
                 value={googleName}
                 onChange={(e) => setGoogleName(e.target.value)}
-                className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-xs focus:outline-none focus:border-[#3C5A48] bg-[#FAF8F5]/40"
+                className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-xs focus:outline-none focus:border-[#3C5A48] bg-[#FAF8F5]/40 text-[#2C2B29]"
               />
               <button
-                type="button"
-                onClick={() => handleGoogleSubmit()}
-                className="w-full mt-1 py-2.5 bg-[#3C5A48] hover:bg-[#2E4738] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+                type="submit"
+                disabled={isLoading}
+                className="w-full mt-1 py-2.5 bg-[#3C5A48] hover:bg-[#2E4738] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
-                Sign In with this Google Account
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Signing In...</span>
+                  </div>
+                ) : (
+                  <span>Continue with this Account</span>
+                )}
               </button>
-            </div>
+            </form>
           </div>
         </div>
       )}

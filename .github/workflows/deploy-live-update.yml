@@ -1,0 +1,57 @@
+name: Deploy Live OTA Update
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'vite.config.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-live-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Package dist folder into dist.zip
+        run: |
+          cd dist
+          zip -r ../dist.zip .
+          cd ..
+
+      - name: Create GitHub Release with dist.zip
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Tabby Live Update v1.0.${{ github.run_number }}
+          body: |
+            🚀 **Automated Tabby Live In-App Update**
+            - Build Number: `${{ github.run_number }}`
+            - Commit: `${{ github.sha }}`
+            - Auto-detected by Tabby Android & Web clients.
+          draft: false
+          prerelease: false
+          files: dist.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

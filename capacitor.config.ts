@@ -27,6 +27,10 @@ const config: CapacitorConfig = {
     Keyboard: {
       resize: 'body',
       style: 'DARK'
+    },
+    CapacitorUpdater: {
+      autoUpdate: false,
+      statsUrl: ''
     }
   }
 };
