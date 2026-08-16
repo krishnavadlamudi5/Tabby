@@ -4,11 +4,6 @@ const config: CapacitorConfig = {
   appId: 'com.tabby.app',
   appName: 'Tabby',
   webDir: 'dist',
-  server: {
-    url: 'https://mytabby.netlify.app/',
-    cleartext: true,
-    androidScheme: 'https'
-  },
   android: {
     allowMixedContent: true,
     backgroundColor: '#FAF8F5',
@@ -16,12 +11,11 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 4000,
+      launchShowDuration: 2000,
       launchAutoHide: true,
       backgroundColor: '#FAF8F5',
       androidScaleType: 'CENTER_CROP',
-      showSpinner: true,
-      spinnerColor: '#3C5A48',
+      showSpinner: false,
       splashFullScreen: true,
       splashImmersive: true
     },
