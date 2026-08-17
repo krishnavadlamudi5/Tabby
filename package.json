@@ -8,6 +8,7 @@
     "dev:frontend": "vite --port=3030 --host=0.0.0.0",
     "dev:backend": "tsx server/index.ts",
     "server": "tsx server/index.ts",
+    "start": "tsx server/index.ts",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
