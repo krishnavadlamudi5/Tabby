@@ -15,7 +15,7 @@ export const DEMO_USERS_SEED = [
   },
   {
     id: 'user-sarah',
-    name: 'Sarah Chen',
+    name: 'Sara Chen',
     email: 'sarah.c@gmail.com',
     phone: '+15550288',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80',
