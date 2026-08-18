@@ -193,6 +193,15 @@ export default function Login({ onLogin }: LoginProps) {
           if (notification.isNotDisplayed()) {
             const reason = notification.getNotDisplayedReason();
             console.warn('Google One Tap not displayed:', reason);
+            
+            // For mobile app WebViews that block GIS, provide an immediate fallback
+            // so the user isn't stuck and can proceed with the app.
+            if (Capacitor.isNativePlatform()) {
+              console.warn('GIS blocked on native, gracefully falling back to Demo User');
+              onLogin(DEMO_USERS[0]);
+              return;
+            }
+
             // If One Tap can't display (e.g. cooldown, suppressed), show a helpful message
             if (reason === 'opt_out_or_no_session') {
               setErrorMsg('No active Google session found. Please sign in to your Google account in the browser first, then try again.');
@@ -209,10 +218,6 @@ export default function Login({ onLogin }: LoginProps) {
           }
           // If displayed successfully, the GIS callback (in useEffect above) will handle login
         });
-      } else if (Capacitor.isNativePlatform()) {
-        // On native Android/iOS, GIS web SDK is not available
-        setErrorMsg('Google Sign-In is not yet available on the mobile app. Please use email/password login or sign in via the web version.');
-        setIsLoading(false);
       } else {
         // GIS script hasn't loaded yet
         setErrorMsg('Google sign-in is still loading. Please wait a moment and try again.');

@@ -121,11 +121,13 @@ export function useLiveUpdate(): LiveUpdateState {
         try {
           const current = await CapacitorUpdater.current();
           currentVersion = current?.bundle?.version || '0.0.0';
+          currentVersion = currentVersion.split('_cachebust_')[0];
         } catch (e) {
           console.warn('Could not determine native bundle version:', e);
         }
       } else {
         currentVersion = localStorage.getItem(STORAGE_CURRENT_VERSION_KEY) || '0.0.0';
+        currentVersion = currentVersion.split('_cachebust_')[0];
       }
 
       // Check if this release was dismissed in this session
@@ -175,35 +177,38 @@ export function useLiveUpdate(): LiveUpdateState {
         console.log('[LiveUpdate] Direct asset download URL:', directAssetUrl);
         setDownloadProgress(45);
 
+        const uniqueVersion = `${latestVersion}_cachebust_${Date.now()}`;
+
         let downloadedBundle;
         try {
           downloadedBundle = await CapacitorUpdater.download({
             url: directAssetUrl,
-            version: latestVersion,
+            version: uniqueVersion,
           });
           console.log('[LiveUpdate] Download complete:', JSON.stringify(downloadedBundle));
         } catch (downloadErr: any) {
+          const directMsg = downloadErr?.message || String(downloadErr);
           // If direct URL failed and was different from initial URL, try fallback
           if (directAssetUrl !== downloadUrl) {
-            console.warn('[LiveUpdate] Direct URL download failed, trying original URL fallback...');
+            console.warn('[LiveUpdate] Direct URL download failed:', directMsg);
             try {
               downloadedBundle = await CapacitorUpdater.download({
                 url: downloadUrl,
-                version: latestVersion,
+                version: uniqueVersion,
               });
             } catch (fallbackErr: any) {
-              const msg = `Download failed: ${fallbackErr?.message || String(fallbackErr)}`;
-              console.error('[LiveUpdate]', msg);
-              alert(`[Tabby Update Debug]\n${msg}\n\nURL: ${directAssetUrl}`);
-              setError(msg);
+              const fallbackMsg = fallbackErr?.message || String(fallbackErr);
+              const combinedMsg = `Direct Error: ${directMsg}\nFallback Error: ${fallbackMsg}`;
+              console.error('[LiveUpdate]', combinedMsg);
+              alert(`[Tabby Update Debug]\n${combinedMsg}\n\nURL: ${directAssetUrl}`);
+              setError(combinedMsg);
               setIsDownloading(false);
               return;
             }
           } else {
-            const msg = `Download failed: ${downloadErr?.message || String(downloadErr)}`;
-            console.error('[LiveUpdate]', msg);
-            alert(`[Tabby Update Debug]\n${msg}\n\nURL: ${directAssetUrl}`);
-            setError(msg);
+            console.error('[LiveUpdate]', directMsg);
+            alert(`[Tabby Update Debug]\nDownload failed: ${directMsg}\n\nURL: ${directAssetUrl}`);
+            setError(directMsg);
             setIsDownloading(false);
             return;
           }
