@@ -44,9 +44,6 @@ export default function MobileHeader({
           className="flex items-center gap-1.5 cursor-pointer"
         >
           <AppLogo size="sm" />
-          <span className="text-[10px] font-extrabold text-[#3C5A48] bg-[#EBF1ED] border border-[#3C5A48]/20 px-2 py-0.5 rounded-full shadow-2xs">
-            v1.0.5 ✨
-          </span>
         </button>
       </div>
 

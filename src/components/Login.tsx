@@ -362,7 +362,7 @@ export default function Login({ onLogin }: LoginProps) {
           </p>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-1.5 rounded-full bg-[#EBF1ED] border border-[#3C5A48]/30 text-[#3C5A48] text-[11px] font-extrabold shadow-2xs">
             <Sparkles className="w-3.5 h-3.5 text-[#3C5A48] animate-bounce" />
-            <span>✨ Sara Live Update Active (v1.0.12)</span>
+            <span>Fast 1-Tap Google Sign-In & Live Sync</span>
           </div>
         </div>
 

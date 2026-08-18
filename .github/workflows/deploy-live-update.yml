@@ -43,16 +43,22 @@ jobs:
           zip -r ../dist.zip .
           cd ..
 
+      - name: Extract Commit Message
+        id: commit_info
+        run: |
+          COMMIT_TITLE=$(git log -1 --pretty=%s)
+          echo "title=$COMMIT_TITLE" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release with dist.zip
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: Tabby Live Update v1.0.${{ github.run_number }}
+          name: v1.0.${{ github.run_number }} - ${{ steps.commit_info.outputs.title }}
           body: |
-            🚀 **Automated Tabby Live In-App Update**
-            - Build Number: `${{ github.run_number }}`
-            - Commit: `${{ github.sha }}`
-            - Auto-detected by Tabby Android & Web clients.
+            ### 🚀 What's New in this Update:
+            - **Change**: ${{ steps.commit_info.outputs.title }}
+            - **Commit**: `${{ github.sha }}`
+            - **Build**: `${{ github.run_number }}`
           draft: false
           prerelease: false
           files: dist.zip
