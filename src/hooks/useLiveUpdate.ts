@@ -115,24 +115,30 @@ export function useLiveUpdate(): LiveUpdateState {
     try {
       setIsDownloading(true);
       setError(null);
-      setDownloadProgress(10);
+      setDownloadProgress(15);
 
       if (Capacitor.isNativePlatform()) {
         // Native Android / iOS OTA update via CapacitorUpdater
-        setDownloadProgress(30);
+        console.log('Starting native live update download:', downloadUrl, 'version:', latestVersion);
+        setDownloadProgress(35);
+
         const downloadedBundle = await CapacitorUpdater.download({
           url: downloadUrl,
           version: latestVersion,
         });
 
+        console.log('Downloaded bundle successfully:', downloadedBundle);
         setDownloadProgress(85);
-        await CapacitorUpdater.set(downloadedBundle);
-        setDownloadProgress(100);
-        
-        // Small delay for smooth visual before instant reload
-        setTimeout(async () => {
+
+        if (downloadedBundle && downloadedBundle.id) {
+          localStorage.setItem(STORAGE_CURRENT_VERSION_KEY, latestVersion);
+          setDownloadProgress(100);
+          await CapacitorUpdater.set({ id: downloadedBundle.id });
+        } else {
+          localStorage.setItem(STORAGE_CURRENT_VERSION_KEY, latestVersion);
+          setDownloadProgress(100);
           await CapacitorUpdater.reload();
-        }, 400);
+        }
       } else {
         // Web Platform update
         setDownloadProgress(60);
@@ -144,7 +150,7 @@ export function useLiveUpdate(): LiveUpdateState {
       }
     } catch (err: any) {
       console.error('Failed to apply live update:', err);
-      setError(err?.message || 'Failed to download update bundle.');
+      setError(err?.message || 'Failed to download update. Please check network connection.');
       setIsDownloading(false);
     }
   }, [latestVersion, downloadUrl]);
