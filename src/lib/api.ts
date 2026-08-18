@@ -74,13 +74,18 @@ export async function registerWithEmail(
   return data.user;
 }
 
-export async function signInWithGoogle(customUser?: Partial<User> & { googleId?: string }): Promise<User> {
+export async function signInWithGoogle(
+  customUser?: Partial<User> & { googleId?: string; credential?: string }
+): Promise<User> {
   const email = customUser?.email || 'alex.split@gmail.com';
   const name = customUser?.name || email.split('@')[0] || 'Google User';
   const avatar = customUser?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80';
   const googleId = customUser?.googleId || customUser?.id || `usr_google_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
   const payload = {
+    // The raw Google ID token, when we have one — the backend verifies it with
+    // Google rather than trusting the fields below.
+    credential: customUser?.credential,
     email,
     name,
     avatar,
@@ -106,6 +111,29 @@ export async function signInWithGoogle(customUser?: Partial<User> & { googleId?:
       friendIds: customUser?.friendIds || [],
     };
   }
+}
+
+// --- Mobile Google Sign-In handoff -----------------------------------------
+// Google refuses to run inside the Capacitor WebView, so the app hands sign-in
+// off to the system browser and polls the backend for the result.
+
+export interface MobileGoogleSession {
+  sessionId: string;
+  loginUrl: string;
+  expiresIn: number;
+}
+
+export async function startMobileGoogleSession(): Promise<MobileGoogleSession> {
+  return await request<MobileGoogleSession>('/auth/mobile-session/start', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function pollMobileGoogleSession(
+  sessionId: string
+): Promise<{ status: 'pending' | 'complete' | 'expired'; user?: User }> {
+  return await request(`/auth/mobile-session/${encodeURIComponent(sessionId)}`);
 }
 
 export async function signOutUser(): Promise<void> {

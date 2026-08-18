@@ -372,50 +372,279 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Google Authentication
+// ---------------------------------------------------------------------------
+
+const GOOGLE_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID ||
+  '888676247797-cn7buordb6vqmd7qm6a35u8n6smievcr.apps.googleusercontent.com';
+
+interface GoogleProfile {
+  email: string;
+  name?: string;
+  avatar?: string;
+  googleId?: string;
+}
+
+// Verifies a Google ID token (JWT credential) with Google and returns the profile.
+// Never trust a raw email posted by a client - always go through this for new flows.
+async function verifyGoogleIdToken(credential: string): Promise<GoogleProfile> {
+  const resp = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+  );
+  if (!resp.ok) {
+    throw new Error('Google token verification failed. Please try signing in again.');
+  }
+  const payload: any = await resp.json();
+
+  if (payload.aud !== GOOGLE_CLIENT_ID) {
+    throw new Error('Google token was issued for a different application.');
+  }
+  if (payload.iss !== 'accounts.google.com' && payload.iss !== 'https://accounts.google.com') {
+    throw new Error('Google token has an untrusted issuer.');
+  }
+  if (!payload.email) {
+    throw new Error('Google token did not contain an email address.');
+  }
+  if (payload.email_verified === 'false' || payload.email_verified === false) {
+    throw new Error('This Google account does not have a verified email address.');
+  }
+
+  return {
+    email: payload.email,
+    name: payload.name,
+    avatar: payload.picture,
+    googleId: payload.sub
+  };
+}
+
+// Finds or creates the Tabby account behind a Google profile.
+async function upsertGoogleUser(profile: GoogleProfile) {
+  const normalizedEmail = profile.email.toLowerCase().trim();
+  let user = await User.findOne({ email: normalizedEmail });
+
+  if (!user) {
+    const userId = profile.googleId || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    user = await User.create({
+      id: userId,
+      name: profile.name || 'Google User',
+      email: normalizedEmail,
+      avatar: profile.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
+      friendIds: [],
+      createdAt: new Date().toISOString()
+    });
+  } else {
+    if (profile.name && (!user.name || user.name === 'Google User')) user.name = profile.name;
+    if (profile.avatar && !user.avatar) user.avatar = profile.avatar;
+    await user.save();
+  }
+
+  await linkGhostUser(user.id, normalizedEmail);
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    avatar: user.avatar,
+    friendIds: user.friendIds
+  };
+}
+
 // POST /api/auth/google (Google Authentication)
+// Preferred body: { credential } - a Google ID token, verified server-side.
+// Legacy body: { email, name, avatar, googleId } - kept so already-installed app
+// bundles that predate token verification keep working.
 router.post('/google', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, name, avatar, googleId } = req.body;
-    if (!email) {
-      res.status(400).json({ error: 'Google email is required' });
+    const { credential, email, name, avatar, googleId } = req.body;
+
+    let profile: GoogleProfile;
+    if (credential) {
+      profile = await verifyGoogleIdToken(credential);
+    } else if (email) {
+      profile = { email, name, avatar, googleId };
+    } else {
+      res.status(400).json({ error: 'Google credential is required' });
       return;
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-    let user = await User.findOne({ email: normalizedEmail });
-
-    if (!user) {
-      const userId = googleId || `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      user = await User.create({
-        id: userId,
-        name: name || 'Google User',
-        email: normalizedEmail,
-        avatar: avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
-        friendIds: [],
-        createdAt: new Date().toISOString()
-      });
-    } else {
-      if (name && (!user.name || user.name === 'Google User')) user.name = name;
-      if (avatar && !user.avatar) user.avatar = avatar;
-      await user.save();
-    }
-
-    await linkGhostUser(user.id, normalizedEmail);
-
-    const userObj = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      avatar: user.avatar,
-      friendIds: user.friendIds
-    };
-
+    const userObj = await upsertGoogleUser(profile);
     res.json({ success: true, user: userObj });
   } catch (error: any) {
     console.error('Google auth error:', error);
     res.status(500).json({ error: error.message || 'Google login failed' });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Mobile Google Sign-In handoff
+//
+// Google blocks OAuth and Google Identity Services inside embedded WebViews, so
+// the Capacitor app cannot run the sign-in itself. Instead the app opens a
+// short-lived handoff page in the system browser (where a real Google session
+// exists), the browser completes sign-in against this server, and the app polls
+// for the resulting account.
+// ---------------------------------------------------------------------------
+
+interface MobileSession {
+  status: 'pending' | 'complete';
+  user?: any;
+  expiresAt: number;
+}
+const mobileSessions = new Map<string, MobileSession>();
+const MOBILE_SESSION_TTL = 10 * 60 * 1000; // 10 minutes
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of mobileSessions.entries()) {
+    if (val.expiresAt < now) mobileSessions.delete(key);
+  }
+}, 5 * 60 * 1000);
+
+function publicBaseUrl(req: Request) {
+  const configured = process.env.APP_PUBLIC_URL;
+  if (configured) return configured.replace(/\/$/, '');
+  const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol;
+  return `${proto}://${req.get('host')}`;
+}
+
+// POST /api/auth/mobile-session/start - app asks for a handoff URL
+router.post('/mobile-session/start', async (req: Request, res: Response): Promise<void> => {
+  const sessionId = `ms_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 12)}`;
+  mobileSessions.set(sessionId, { status: 'pending', expiresAt: Date.now() + MOBILE_SESSION_TTL });
+  res.json({
+    success: true,
+    sessionId,
+    loginUrl: `${publicBaseUrl(req)}/api/auth/mobile-login?s=${encodeURIComponent(sessionId)}`,
+    expiresIn: MOBILE_SESSION_TTL / 1000
+  });
+});
+
+// POST /api/auth/mobile-session/complete - called by the handoff page in the browser
+router.post('/mobile-session/complete', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sessionId, credential } = req.body;
+    if (!sessionId || !credential) {
+      res.status(400).json({ error: 'sessionId and credential are required' });
+      return;
+    }
+
+    const entry = mobileSessions.get(sessionId);
+    if (!entry || entry.expiresAt < Date.now()) {
+      mobileSessions.delete(sessionId);
+      res.status(400).json({ error: 'This sign-in link has expired. Please try again from the app.' });
+      return;
+    }
+
+    const profile = await verifyGoogleIdToken(credential);
+    const userObj = await upsertGoogleUser(profile);
+
+    entry.status = 'complete';
+    entry.user = userObj;
+    mobileSessions.set(sessionId, entry);
+
+    res.json({ success: true, name: userObj.name, email: userObj.email });
+  } catch (error: any) {
+    console.error('Mobile Google session error:', error);
+    res.status(500).json({ error: error.message || 'Google login failed' });
+  }
+});
+
+// GET /api/auth/mobile-session/:sessionId - app polls until the browser finishes
+router.get('/mobile-session/:sessionId', async (req: Request, res: Response): Promise<void> => {
+  const entry = mobileSessions.get(req.params.sessionId);
+  if (!entry || entry.expiresAt < Date.now()) {
+    mobileSessions.delete(req.params.sessionId);
+    res.json({ status: 'expired' });
+    return;
+  }
+  if (entry.status === 'complete') {
+    mobileSessions.delete(req.params.sessionId); // single use
+    res.json({ status: 'complete', user: entry.user });
+    return;
+  }
+  res.json({ status: 'pending' });
+});
+
+// GET /api/auth/mobile-login?s=<sessionId> - the page opened in the system browser
+router.get('/mobile-login', (req: Request, res: Response): void => {
+  const safeSessionId = JSON.stringify(String(req.query.s || ''));
+  const clientId = JSON.stringify(GOOGLE_CLIENT_ID);
+
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign in to Tabby</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:#F8F5F2; color:#2C2B29; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; padding:24px; }
+  .card { background:#fff; border:1px solid #E6E1DA; border-radius:24px; padding:32px 24px;
+          max-width:380px; width:100%; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,.06); }
+  h1 { font-size:20px; margin:0 0 6px; color:#3C5A48; }
+  p { font-size:14px; color:#736F6A; margin:0 0 22px; line-height:1.5; }
+  #btn { display:flex; justify-content:center; min-height:44px; }
+  .msg { margin-top:18px; font-size:14px; font-weight:600; }
+  .ok { color:#3C5A48; } .err { color:#C0392B; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Sign in to Tabby</h1>
+    <p id="lead">Choose your Google account. You will be returned to the app automatically.</p>
+    <div id="btn"></div>
+    <div id="msg" class="msg"></div>
+  </div>
+<script>
+  var SESSION_ID = ${safeSessionId};
+  var CLIENT_ID = ${clientId};
+
+  function show(text, cls) {
+    var m = document.getElementById('msg');
+    m.textContent = text;
+    m.className = 'msg ' + cls;
+  }
+
+  function onCredential(response) {
+    show('Signing you in...', 'ok');
+    fetch('/api/auth/mobile-session/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: SESSION_ID, credential: response.credential })
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.d.error || 'Sign-in failed');
+        document.getElementById('btn').style.display = 'none';
+        document.getElementById('lead').textContent = 'Signed in as ' + res.d.email + '.';
+        show('All set - you can close this tab and return to Tabby.', 'ok');
+      })
+      .catch(function (e) { show(e.message || 'Sign-in failed. Please try again.', 'err'); });
+  }
+
+  var tries = 0;
+  var timer = setInterval(function () {
+    tries++;
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      clearInterval(timer);
+      if (!SESSION_ID) { show('Missing session. Please start again from the Tabby app.', 'err'); return; }
+      window.google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCredential });
+      window.google.accounts.id.renderButton(document.getElementById('btn'), {
+        theme: 'outline', size: 'large', shape: 'pill', text: 'continue_with', width: 280
+      });
+    } else if (tries > 40) {
+      clearInterval(timer);
+      show('Could not load Google Sign-In. Please check your connection and reload.', 'err');
+    }
+  }, 250);
+</script>
+</body>
+</html>`);
 });
 
 export default router;

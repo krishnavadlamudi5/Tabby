@@ -74,6 +74,18 @@ async function resolveDirectDownloadUrl(initialUrl: string): Promise<string> {
   return targetUrl;
 }
 
+/**
+ * capacitor-updater rejects with a bare "Failed to download from: <url>" and
+ * hides the real cause in `code`/`data`, so pull everything out for the banner.
+ */
+function describeUpdateError(err: any): string {
+  const parts = [err?.message || String(err)];
+  if (err?.code) parts.push(`code: ${err.code}`);
+  const detail = err?.data?.message || err?.data?.error || err?.cause?.message;
+  if (detail) parts.push(String(detail));
+  return parts.join(' — ');
+}
+
 export function useLiveUpdate(): LiveUpdateState {
   const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
@@ -187,7 +199,7 @@ export function useLiveUpdate(): LiveUpdateState {
           });
           console.log('[LiveUpdate] Download complete:', JSON.stringify(downloadedBundle));
         } catch (downloadErr: any) {
-          const directMsg = downloadErr?.message || String(downloadErr);
+          const directMsg = describeUpdateError(downloadErr);
           // If direct URL failed and was different from initial URL, try fallback
           if (directAssetUrl !== downloadUrl) {
             console.warn('[LiveUpdate] Direct URL download failed:', directMsg);
@@ -197,18 +209,15 @@ export function useLiveUpdate(): LiveUpdateState {
                 version: uniqueVersion,
               });
             } catch (fallbackErr: any) {
-              const fallbackMsg = fallbackErr?.message || String(fallbackErr);
-              const combinedMsg = `Direct Error: ${directMsg}\nFallback Error: ${fallbackMsg}`;
-              console.error('[LiveUpdate]', combinedMsg);
-              alert(`[Tabby Update Debug]\n${combinedMsg}\n\nURL: ${directAssetUrl}`);
+              const combinedMsg = `Update download failed. ${describeUpdateError(fallbackErr)}`;
+              console.error('[LiveUpdate]', combinedMsg, { directMsg, directAssetUrl });
               setError(combinedMsg);
               setIsDownloading(false);
               return;
             }
           } else {
-            console.error('[LiveUpdate]', directMsg);
-            alert(`[Tabby Update Debug]\nDownload failed: ${directMsg}\n\nURL: ${directAssetUrl}`);
-            setError(directMsg);
+            console.error('[LiveUpdate]', directMsg, { directAssetUrl });
+            setError(`Update download failed. ${directMsg}`);
             setIsDownloading(false);
             return;
           }
@@ -219,7 +228,6 @@ export function useLiveUpdate(): LiveUpdateState {
         if (!downloadedBundle || !downloadedBundle.id) {
           const msg = `Bundle invalid after download: ${JSON.stringify(downloadedBundle)}`;
           console.error('[LiveUpdate]', msg);
-          alert(`[Tabby Update Debug]\n${msg}`);
           setError('Downloaded bundle is invalid.');
           setIsDownloading(false);
           return;
@@ -232,9 +240,8 @@ export function useLiveUpdate(): LiveUpdateState {
           await CapacitorUpdater.set({ id: downloadedBundle.id });
           // JS context is destroyed after set() — nothing below runs
         } catch (setErr: any) {
-          const msg = `Set bundle failed: ${setErr?.message || String(setErr)}`;
-          console.error('[LiveUpdate]', msg);
-          alert(`[Tabby Update Debug]\n${msg}\n\nBundle ID: ${downloadedBundle.id}`);
+          const msg = `Could not apply the update. ${describeUpdateError(setErr)}`;
+          console.error('[LiveUpdate]', msg, { bundleId: downloadedBundle.id });
           setError(msg);
           setIsDownloading(false);
         }
@@ -248,9 +255,8 @@ export function useLiveUpdate(): LiveUpdateState {
         }, 400);
       }
     } catch (err: any) {
-      const msg = `Unexpected error: ${err?.message || String(err)}`;
+      const msg = `Unexpected error: ${describeUpdateError(err)}`;
       console.error('[LiveUpdate]', msg);
-      alert(`[Tabby Update Debug]\n${msg}`);
       setError(msg);
       setIsDownloading(false);
     }
