@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
+import { randomBytes } from 'crypto';
 
 dotenv.config();
 
@@ -11,7 +12,7 @@ if (!JWT_SECRET) {
   console.error(
     '\nFATAL: JWT_SECRET environment variable is not set.\n' +
     'Set JWT_SECRET to a long random string in your .env file (and in your Render/host env vars) before starting the server.\n' +
-    'Example: JWT_SECRET="' + require('crypto').randomBytes(48).toString('hex') + '"\n'
+    'Example: JWT_SECRET="' + randomBytes(48).toString('hex') + '"\n'
   );
   process.exit(1);
 }

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { User } from '../types';
 import { DEMO_USERS } from '../data/demoData';
@@ -13,10 +13,9 @@ import {
   registerWithEmail,
   sendOtpApi,
   resetPasswordApi,
-  startMobileGoogleSession,
-  pollMobileGoogleSession,
   demoLoginApi
 } from '../lib/api';
+import { SocialLogin } from '@capgo/capacitor-social-login';
 import { 
   Sparkles, 
   ArrowRight, 
@@ -55,6 +54,10 @@ const COUNTRY_CODES = [
   { code: '+86', name: 'China', iso: 'CN' },
 ];
 
+const GOOGLE_CLIENT_ID =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  '888676247797-cn7buordb6vqmd7qm6a35u8n6smievcr.apps.googleusercontent.com';
+
 export default function Login({ onLogin }: LoginProps) {
   // Modes: 'signin' | 'register' | 'forgot'
   const [activeTab, setActiveTab] = useState<'signin' | 'register' | 'forgot'>('signin');
@@ -79,9 +82,8 @@ export default function Login({ onLogin }: LoginProps) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [resendCooldown, setResendCooldown] = useState<number>(0);
 
-  // Mobile Google Sign-In handoff (system browser + backend polling)
-  const [googleHandoffUrl, setGoogleHandoffUrl] = useState<string>('');
-  const googleHandoffTimer = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  // Native Google Sign-In is initialized once, lazily, on first use.
+  const socialLoginReady = React.useRef(false);
 
   const fullPhone = `${countryCode}${phoneNumber.trim()}`;
 
@@ -111,13 +113,11 @@ export default function Login({ onLogin }: LoginProps) {
 
   // Initialize Google Identity Services (GIS)
   useEffect(() => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '888676247797-cn7buordb6vqmd7qm6a35u8n6smievcr.apps.googleusercontent.com';
-
     const initGis = () => {
       if (typeof window !== 'undefined' && window.google?.accounts?.id) {
         try {
           window.google.accounts.id.initialize({
-            client_id: clientId,
+            client_id: GOOGLE_CLIENT_ID,
             callback: async (response: any) => {
               if (response?.credential) {
                 const payload = parseGoogleJwt(response.credential);
@@ -138,6 +138,10 @@ export default function Login({ onLogin }: LoginProps) {
             },
             auto_select: false,
             cancel_on_tap_outside: true,
+            // FedCM is the only supported One Tap path now that browsers
+            // restrict third-party cookies. Declaring it keeps behaviour
+            // consistent instead of depending on the SDK default.
+            use_fedcm_for_prompt: true,
           });
         } catch (err) {
           console.warn('Google One-Tap initialization error:', err);
@@ -182,75 +186,46 @@ export default function Login({ onLogin }: LoginProps) {
     return { score: 4, text: 'Strong', color: 'bg-emerald-500' };
   };
 
-  // Stop any in-flight mobile handoff polling
-  const cancelGoogleHandoff = useCallback(() => {
-    if (googleHandoffTimer.current) {
-      clearInterval(googleHandoffTimer.current);
-      googleHandoffTimer.current = null;
-    }
-    setGoogleHandoffUrl('');
-    setIsLoading(false);
-  }, []);
-
-  useEffect(() => cancelGoogleHandoff, [cancelGoogleHandoff]);
-
   /**
    * Native (Capacitor) Google Sign-In.
    *
-   * Google blocks OAuth and Google Identity Services inside embedded WebViews,
-   * so the in-app flow can never work. Instead we ask the backend for a
-   * short-lived sign-in session, open its handoff page in the system browser
-   * (which has the user's real Google session), and poll until the browser
-   * reports back.
+   * Uses Android Credential Manager via @capgo/capacitor-social-login, so the
+   * account picker is a native sheet inside the app - no system browser, no
+   * handoff page, no polling. `webClientId` is the Web OAuth client, which
+   * makes the returned ID token's `aud` match what the backend verifies.
    */
   const startNativeGoogleSignIn = async () => {
     setErrorMsg('');
     setIsLoading(true);
 
-    let session;
     try {
-      session = await startMobileGoogleSession();
-    } catch (err: any) {
-      console.error('Could not start mobile Google session:', err);
-      setErrorMsg('Could not reach the Tabby server. Please check your connection and try again.');
-      setIsLoading(false);
-      return;
-    }
+      if (!socialLoginReady.current) {
+        await SocialLogin.initialize({ google: { webClientId: GOOGLE_CLIENT_ID } });
+        socialLoginReady.current = true;
+      }
 
-    setGoogleHandoffUrl(session.loginUrl);
+      const { result } = await SocialLogin.login({
+        provider: 'google',
+        options: { scopes: ['email', 'profile'] }
+      });
 
-    // Capacitor intercepts navigations to external hosts and hands them to the
-    // system browser, so the app itself stays on this screen.
-    try {
-      window.location.href = session.loginUrl;
-    } catch (err) {
-      console.warn('Could not open the system browser automatically:', err);
-    }
-
-    const deadline = Date.now() + (session.expiresIn || 600) * 1000;
-    if (googleHandoffTimer.current) clearInterval(googleHandoffTimer.current);
-
-    googleHandoffTimer.current = setInterval(async () => {
-      if (Date.now() > deadline) {
-        cancelGoogleHandoff();
-        setErrorMsg('Google sign-in timed out. Please try again.');
+      const idToken = (result as any)?.idToken;
+      if (!idToken) {
+        setErrorMsg('Google did not return a sign-in token. Please try again.');
         return;
       }
-      try {
-        const result = await pollMobileGoogleSession(session.sessionId);
-        if (result.status === 'complete' && result.user && result.token) {
-          cancelGoogleHandoff();
-          onLogin(result.user, result.token);
-        } else if (result.status === 'expired') {
-          cancelGoogleHandoff();
-          setErrorMsg('Google sign-in expired before it completed. Please try again.');
-        }
-      } catch (err) {
-        // Transient network blips are expected while the browser is in front —
-        // keep polling until the deadline.
-        console.warn('Mobile Google poll failed:', err);
-      }
-    }, 2500);
+
+      const { user, token } = await signInWithGoogle(idToken);
+      onLogin(user, token);
+    } catch (err: any) {
+      const message = String(err?.message || err || '');
+      // Dismissing the native account sheet is a normal action, not a failure.
+      if (/cancel|dismiss|12501/i.test(message)) return;
+      console.error('Native Google sign-in failed:', err);
+      setErrorMsg(message || 'Google sign-in failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Google Sign-In via Google Identity Services (GIS) One Tap
@@ -267,28 +242,24 @@ export default function Login({ onLogin }: LoginProps) {
     try {
       // Check if Google Identity Services SDK is loaded and initialized
       if (typeof window !== 'undefined' && window.google?.accounts?.id) {
-        // Trigger the Google One Tap / account chooser prompt
+        // Under FedCM, isNotDisplayed()/getNotDisplayedReason()/isSkippedMoment()
+        // were removed and throw if called, which previously swallowed every
+        // sign-in into the generic catch below. The credential callback in the
+        // effect above is now the only success path; the moment callback is
+        // used purely for best-effort diagnostics.
         window.google.accounts.id.prompt((notification: any) => {
-          if (notification.isNotDisplayed()) {
-            const reason = notification.getNotDisplayedReason();
-            console.warn('Google One Tap not displayed:', reason);
-
-            // If One Tap can't display (e.g. cooldown, suppressed), show a helpful message
-            if (reason === 'opt_out_or_no_session') {
-              setErrorMsg('No active Google session found. Please sign in to your Google account in the browser first, then try again.');
-            } else if (reason === 'suppressed_by_user') {
-              setErrorMsg('Google sign-in was previously dismissed. Please try again in a few minutes or use email/password login.');
-            } else {
-              setErrorMsg('Google sign-in is temporarily unavailable. Please use email/password login.');
+          try {
+            if (typeof notification?.getMomentType === 'function') {
+              console.info('Google One Tap moment:', notification.getMomentType());
             }
-            setIsLoading(false);
-          } else if (notification.isSkippedMoment()) {
-            console.warn('Google One Tap skipped:', notification.getSkippedReason());
-            setErrorMsg('Google sign-in was cancelled. Please try again.');
-            setIsLoading(false);
+          } catch {
+            // Older/newer SDK shapes differ - diagnostics must never break sign-in.
           }
-          // If displayed successfully, the GIS callback (in useEffect above) will handle login
         });
+
+        // The prompt either resolves through the credential callback or the
+        // user dismisses it; nothing further to await here.
+        setIsLoading(false);
       } else {
         // GIS script hasn't loaded yet
         setErrorMsg('Google sign-in is still loading. Please wait a moment and try again.');
@@ -509,34 +480,6 @@ export default function Login({ onLogin }: LoginProps) {
                 </>
               )}
             </button>
-
-            {/* Waiting for the system browser to finish Google sign-in */}
-            {googleHandoffUrl && (
-              <div className="rounded-2xl border border-[#3C5A48]/30 bg-[#EBF1ED] px-4 py-3 flex flex-col gap-2" id="google-handoff-notice">
-                <div className="flex items-start gap-2.5">
-                  <div className="w-4 h-4 mt-0.5 shrink-0 border-2 border-[#3C5A48] border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-xs font-semibold text-[#3C5A48] leading-relaxed">
-                    Finish signing in with Google in your browser, then come back here — Tabby will log you in automatically.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 pl-6.5">
-                  <button
-                    type="button"
-                    onClick={() => { window.location.href = googleHandoffUrl; }}
-                    className="text-[11px] font-extrabold text-[#3C5A48] underline underline-offset-2 cursor-pointer"
-                  >
-                    Reopen browser
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelGoogleHandoff}
-                    className="text-[11px] font-extrabold text-[#736F6A] underline underline-offset-2 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Divider */}
             <div className="relative flex py-1 items-center" id="auth-divider">
