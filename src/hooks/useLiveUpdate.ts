@@ -119,25 +119,48 @@ export function useLiveUpdate(): LiveUpdateState {
 
       if (Capacitor.isNativePlatform()) {
         // Native Android / iOS OTA update via CapacitorUpdater
-        console.log('Starting native live update download:', downloadUrl, 'version:', latestVersion);
+        console.log('[LiveUpdate] Starting download:', downloadUrl, 'version:', latestVersion);
         setDownloadProgress(35);
 
-        const downloadedBundle = await CapacitorUpdater.download({
-          url: downloadUrl,
-          version: latestVersion,
-        });
+        let downloadedBundle;
+        try {
+          downloadedBundle = await CapacitorUpdater.download({
+            url: downloadUrl,
+            version: latestVersion,
+          });
+          console.log('[LiveUpdate] Download complete:', JSON.stringify(downloadedBundle));
+        } catch (downloadErr: any) {
+          const msg = `Download failed: ${downloadErr?.message || String(downloadErr)}`;
+          console.error('[LiveUpdate]', msg);
+          alert(`[Tabby Update Debug]\n${msg}\n\nURL: ${downloadUrl}`);
+          setError(msg);
+          setIsDownloading(false);
+          return;
+        }
 
-        console.log('Downloaded bundle successfully:', downloadedBundle);
         setDownloadProgress(85);
 
-        if (downloadedBundle && downloadedBundle.id) {
+        if (!downloadedBundle || !downloadedBundle.id) {
+          const msg = `Bundle invalid after download: ${JSON.stringify(downloadedBundle)}`;
+          console.error('[LiveUpdate]', msg);
+          alert(`[Tabby Update Debug]\n${msg}`);
+          setError('Downloaded bundle is invalid.');
+          setIsDownloading(false);
+          return;
+        }
+
+        try {
           localStorage.setItem(STORAGE_CURRENT_VERSION_KEY, latestVersion);
           setDownloadProgress(100);
+          console.log('[LiveUpdate] Calling CapacitorUpdater.set with id:', downloadedBundle.id);
           await CapacitorUpdater.set({ id: downloadedBundle.id });
-        } else {
-          localStorage.setItem(STORAGE_CURRENT_VERSION_KEY, latestVersion);
-          setDownloadProgress(100);
-          await CapacitorUpdater.reload();
+          // JS context is destroyed after set() — nothing below runs
+        } catch (setErr: any) {
+          const msg = `Set bundle failed: ${setErr?.message || String(setErr)}`;
+          console.error('[LiveUpdate]', msg);
+          alert(`[Tabby Update Debug]\n${msg}\n\nBundle ID: ${downloadedBundle.id}`);
+          setError(msg);
+          setIsDownloading(false);
         }
       } else {
         // Web Platform update
@@ -149,8 +172,10 @@ export function useLiveUpdate(): LiveUpdateState {
         }, 400);
       }
     } catch (err: any) {
-      console.error('Failed to apply live update:', err);
-      setError(err?.message || 'Failed to download update. Please check network connection.');
+      const msg = `Unexpected error: ${err?.message || String(err)}`;
+      console.error('[LiveUpdate]', msg);
+      alert(`[Tabby Update Debug]\n${msg}`);
+      setError(msg);
       setIsDownloading(false);
     }
   }, [latestVersion, downloadUrl]);
