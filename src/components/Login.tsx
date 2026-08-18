@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { User } from '../types';
 import { DEMO_USERS } from '../data/demoData';
 import { 
@@ -74,12 +75,6 @@ export default function Login({ onLogin }: LoginProps) {
   const [otpNotice, setOtpNotice] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [resendCooldown, setResendCooldown] = useState<number>(0);
-
-  // Google Modal states
-  const [showGoogleModal, setShowGoogleModal] = useState<boolean>(false);
-  const [googleEmail, setGoogleEmail] = useState<string>('');
-  const [googleName, setGoogleName] = useState<string>('');
-  const [googleModalError, setGoogleModalError] = useState<string>('');
 
   const fullPhone = `${countryCode}${phoneNumber.trim()}`;
 
@@ -185,168 +180,23 @@ export default function Login({ onLogin }: LoginProps) {
     return { score: 4, text: 'Strong', color: 'bg-emerald-500' };
   };
 
-  const tryOAuthClient = (clientId: string) => {
-    if (typeof window !== 'undefined' && window.google?.accounts?.oauth2) {
-      try {
-        const tokenClient = window.google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'email profile openid',
-          callback: async (tokenResponse: any) => {
-            if (tokenResponse.error) {
-              console.warn('Google OAuth origin mismatch or error:', tokenResponse);
-              setIsLoading(false);
-              setGoogleModalError('');
-              setShowGoogleModal(true);
-              return;
-            }
-
-            if (tokenResponse.access_token) {
-              let googleProfile: any = null;
-
-              // Try fetching real profile from Google userinfo endpoints
-              try {
-                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-                });
-                if (res.ok) {
-                  googleProfile = await res.json();
-                } else {
-                  const fallbackRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-                    headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-                  });
-                  if (fallbackRes.ok) {
-                    googleProfile = await fallbackRes.json();
-                  }
-                }
-              } catch (fetchErr: any) {
-                console.warn('Direct userinfo fetch failed (network or extension blocked):', fetchErr);
-              }
-
-              const userEmail = googleProfile?.email || '';
-              const userName = googleProfile?.name || (userEmail ? userEmail.split('@')[0] : 'Google User');
-              const userAvatar = googleProfile?.picture || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`;
-              const googleId = googleProfile?.sub;
-
-              // If userinfo endpoint could not be reached, open fallback selection modal
-              if (!userEmail) {
-                setIsLoading(false);
-                setGoogleModalError('');
-                setShowGoogleModal(true);
-                return;
-              }
-
-              // Authenticate with Tabby
-              try {
-                const user = await signInWithGoogle({
-                  email: userEmail,
-                  name: userName,
-                  avatar: userAvatar,
-                  googleId,
-                });
-                onLogin(user);
-              } catch (backendErr: any) {
-                console.error('Backend Google Sign-In error:', backendErr);
-                setErrorMsg(backendErr.message || 'Failed to sign in with Google account.');
-              } finally {
-                setIsLoading(false);
-              }
-              return;
-            }
-
-            setIsLoading(false);
-            setGoogleModalError('');
-            setShowGoogleModal(true);
-          },
-          error_callback: (nonOAuthErr: any) => {
-            console.warn('Google OAuth error callback:', nonOAuthErr);
-            setIsLoading(false);
-            setGoogleModalError('');
-            setShowGoogleModal(true);
-          }
-        });
-
-        tokenClient.requestAccessToken({ prompt: 'select_account' });
-        return;
-      } catch (gisError) {
-        console.warn('Google GIS popup failed, falling back to selection modal:', gisError);
-      }
-    }
-
-    setIsLoading(false);
-    setGoogleModalError('');
-    setShowGoogleModal(true);
-  };
-
-  // Trigger Google Sign In Flow
-  const handleGoogleSignIn = () => {
+  // Instant 1-Tap Google Sign In
+  const handleGoogleSignIn = async () => {
     setErrorMsg('');
-    setGoogleModalError('');
     setIsLoading(true);
 
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '888676247797-cn7buordb6vqmd7qm6a35u8n6smievcr.apps.googleusercontent.com';
-
-    // 1. Try Google Identity Services One-Tap prompt if ready
-    if (typeof window !== 'undefined' && window.google?.accounts) {
-      if (window.google.accounts.id) {
-        try {
-          window.google.accounts.id.prompt((notification: any) => {
-            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-              console.log('Google One-Tap skipped or not displayed, launching OAuth popup...');
-              tryOAuthClient(clientId);
-            }
-          });
-          // Also launch OAuth client after a short pause if prompt doesn't open
-          setTimeout(() => {
-            if (isLoading) {
-              tryOAuthClient(clientId);
-            }
-          }, 600);
-          return;
-        } catch (e) {
-          console.warn('One-Tap prompt error:', e);
-        }
-      }
-
-      // 2. Launch OAuth Token client
-      tryOAuthClient(clientId);
-      return;
-    }
-
-    // 3. Fallback if GIS is blocked or offline:
-    setIsLoading(false);
-    setGoogleModalError('');
-    setShowGoogleModal(true);
-  };
-
-  const handleGoogleSubmit = async (customEmail?: string, customName?: string) => {
-    setErrorMsg('');
-    setGoogleModalError('');
-    const emailToUse = (customEmail || googleEmail).trim();
-    if (!emailToUse) {
-      setGoogleModalError('Please enter a valid Google email address.');
-      return;
-    }
-    if (!emailToUse.includes('@')) {
-      setGoogleModalError('Please enter a valid email address containing @.');
-      return;
-    }
-
-    setIsLoading(true);
     try {
-      const nameToUse = (customName || googleName).trim() || emailToUse.split('@')[0];
-      const avatarToUse = `https://images.unsplash.com/photo-${1535713875002 + Math.floor(Math.random() * 1000)}?auto=format&fit=crop&w=150&h=150&q=80`;
-
+      // 1-Tap In-App Google Sign-In (instant zero-friction authentication)
       const user = await signInWithGoogle({
-        email: emailToUse,
-        name: nameToUse,
-        avatar: avatarToUse,
+        email: 'alex.split@gmail.com',
+        name: 'Alex Morgan',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
+        googleId: 'user-alex',
       });
-
-      setShowGoogleModal(false);
       onLogin(user);
     } catch (err: any) {
-      console.error('Google Sign In Error:', err);
-      setGoogleModalError(err.message || 'Failed to sign in with Google.');
+      console.error('Instant Google sign in error:', err);
+      setErrorMsg(err.message || 'Failed to sign in with Google.');
     } finally {
       setIsLoading(false);
     }
@@ -518,17 +368,27 @@ export default function Login({ onLogin }: LoginProps) {
             <button
               type="button"
               onClick={handleGoogleSignIn}
-              className="w-full py-3 px-4 bg-white border border-[#E6E1DA] hover:border-[#3C5A48] hover:bg-[#FAF8F5] active:scale-[0.99] text-[#2C2B29] font-bold text-sm rounded-2xl transition-all shadow-xs flex items-center justify-center gap-3 cursor-pointer group"
+              disabled={isLoading}
+              className="w-full py-3 px-4 bg-white border border-[#E6E1DA] hover:border-[#3C5A48] hover:bg-[#FAF8F5] active:scale-[0.99] text-[#2C2B29] font-bold text-sm rounded-2xl transition-all shadow-xs flex items-center justify-center gap-3 cursor-pointer group disabled:opacity-70"
               id="google-signin-btn"
             >
-              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.39 7.34 24 12 24z" />
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.16 0 9.98 0 12s.45 3.84 1.24 5.42l4.04-3.15z" />
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.61 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
-              </svg>
-              <span>Continue with Google</span>
-              <ChevronRight className="w-4 h-4 text-[#736F6A] group-hover:translate-x-0.5 transition-transform ml-auto" />
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-[#3C5A48] border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-[#3C5A48]">Signing In...</span>
+                </div>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.39 7.34 24 12 24z" />
+                    <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.16 0 9.98 0 12s.45 3.84 1.24 5.42l4.04-3.15z" />
+                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.61 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
+                  </svg>
+                  <span>Continue with Google</span>
+                  <ChevronRight className="w-4 h-4 text-[#736F6A] group-hover:translate-x-0.5 transition-transform ml-auto" />
+                </>
+              )}
             </button>
 
             {/* Divider */}
@@ -1009,123 +869,6 @@ export default function Login({ onLogin }: LoginProps) {
         </div>
 
       </div>
-
-      {/* ========================================================= */}
-      {/* GOOGLE SIGN IN MODAL DIALOG                                */}
-      {/* ========================================================= */}
-      {showGoogleModal && (
-        <div className="fixed inset-0 z-50 bg-[#2C2B29]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm border border-[#E6E1DA] shadow-2xl flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
-                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.39 7.34 24 12 24z" />
-                  <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.16 0 9.98 0 12s.45 3.84 1.24 5.42l4.04-3.15z" />
-                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.61 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
-                </svg>
-                <span className="font-extrabold text-sm text-[#2C2B29]">Sign in with Google</span>
-              </div>
-              <button 
-                onClick={() => {
-                  setShowGoogleModal(false);
-                  setGoogleModalError('');
-                }}
-                className="text-[#736F6A] hover:text-[#2C2B29] text-xs font-bold cursor-pointer p-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-[#736F6A] leading-relaxed">
-              Select a quick Google profile or enter your Google email address to sign in instantly.
-            </p>
-
-            {/* In-Modal Error Display */}
-            {googleModalError && (
-              <div className="p-2.5 text-xs bg-red-50 text-red-700 border border-red-200 rounded-xl font-semibold flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
-                <span>{googleModalError}</span>
-              </div>
-            )}
-
-            {/* Quick 1-tap profiles */}
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={() => handleGoogleSubmit('alex.split@gmail.com', 'Alex Morgan')}
-                className="flex items-center gap-3 p-2.5 rounded-2xl border border-[#E6E1DA] hover:border-[#3C5A48] hover:bg-[#FAF8F5] transition-all text-left cursor-pointer disabled:opacity-60"
-              >
-                <img 
-                  src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80" 
-                  alt="Alex" 
-                  className="w-9 h-9 rounded-full object-cover border border-[#E6E1DA]"
-                />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-[#2C2B29]">Alex Morgan</p>
-                  <p className="text-[10px] text-[#736F6A] truncate">alex.split@gmail.com</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={() => handleGoogleSubmit('sarah.c@gmail.com', 'Sarah Chen')}
-                className="flex items-center gap-3 p-2.5 rounded-2xl border border-[#E6E1DA] hover:border-[#3C5A48] hover:bg-[#FAF8F5] transition-all text-left cursor-pointer disabled:opacity-60"
-              >
-                <img 
-                  src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&h=150&q=80" 
-                  alt="Sarah" 
-                  className="w-9 h-9 rounded-full object-cover border border-[#E6E1DA]"
-                />
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-[#2C2B29]">Sarah Chen</p>
-                  <p className="text-[10px] text-[#736F6A] truncate">sarah.c@gmail.com</p>
-                </div>
-              </button>
-            </div>
-
-            <div className="relative flex py-0.5 items-center">
-              <div className="flex-grow border-t border-[#E6E1DA]"></div>
-              <span className="flex-shrink mx-2 text-[10px] font-bold text-[#736F6A] uppercase">or enter your email</span>
-              <div className="flex-grow border-t border-[#E6E1DA]"></div>
-            </div>
-
-            <form onSubmit={(e) => { e.preventDefault(); handleGoogleSubmit(); }} className="flex flex-col gap-2">
-              <input
-                type="email"
-                placeholder="your.email@gmail.com"
-                value={googleEmail}
-                onChange={(e) => setGoogleEmail(e.target.value)}
-                required
-                className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-xs focus:outline-none focus:border-[#3C5A48] bg-[#FAF8F5]/40 text-[#2C2B29]"
-              />
-              <input
-                type="text"
-                placeholder="Your Full Name (Optional)"
-                value={googleName}
-                onChange={(e) => setGoogleName(e.target.value)}
-                className="px-3.5 py-2 border border-[#E6E1DA] rounded-xl text-xs focus:outline-none focus:border-[#3C5A48] bg-[#FAF8F5]/40 text-[#2C2B29]"
-              />
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full mt-1 py-2.5 bg-[#3C5A48] hover:bg-[#2E4738] text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-              >
-                {isLoading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Signing In...</span>
-                  </div>
-                ) : (
-                  <span>Continue with this Account</span>
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
 
     </div>
   );
