@@ -360,6 +360,10 @@ export default function Login({ onLogin }: LoginProps) {
           <p className="text-xs text-[#736F6A] max-w-xs mt-1" id="brand-tagline">
             Split bills, track shared expenses & settle up seamlessly with MongoDB.
           </p>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-1.5 rounded-full bg-[#EBF1ED] border border-[#3C5A48]/30 text-[#3C5A48] text-[11px] font-extrabold shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-[#3C5A48] animate-bounce" />
+            <span>✨ Live Demo Update Active (v1.0.5)</span>
+          </div>
         </div>
 
         {/* 1-Tap Google Sign In */}
