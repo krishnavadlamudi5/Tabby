@@ -39,9 +39,23 @@ jobs:
 
       - name: Package dist folder into dist.zip
         run: |
-          cd dist
-          zip -r ../dist.zip .
-          cd ..
+          # `zip -r` UPDATES an existing archive rather than replacing it, so any
+          # stale dist.zip in the tree would leave old entries inside the release
+          # bundle. Always start from a clean archive.
+          rm -f dist.zip
+          (cd dist && zip -r ../dist.zip .)
+          unzip -l dist.zip
+          # capacitor-updater refuses the whole bundle if any zip entry uses a
+          # Windows path separator, so fail loudly here instead of shipping it.
+          if unzip -l dist.zip | grep -q '\\'; then
+            echo "::error::dist.zip contains backslash paths - capacitor-updater will refuse it"
+            exit 1
+          fi
+          # A bundle without index.html at the root is not loadable either.
+          if ! unzip -l dist.zip | grep -qE ' index\.html$'; then
+            echo "::error::dist.zip has no index.html at its root"
+            exit 1
+          fi
 
       - name: Extract Commit Message
         id: commit_info
