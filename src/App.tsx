@@ -189,7 +189,7 @@ export default function App() {
                 {isLiveDownloading ? (
                   <span><strong>Downloading Update {liveLatestVersion || ''}...</strong> ({liveDownloadProgress}%) Reloading soon</span>
                 ) : (
-                  <span><strong>Tabby Update {liveLatestVersion || 'v1.0.4'} Available!</strong> Click to update in-app.</span>
+                  <span><strong>Tabby Update {liveLatestVersion ? `${liveLatestVersion} ` : ''}Available!</strong> Click to update in-app.</span>
                 )}
               </span>
             </div>
@@ -251,7 +251,7 @@ export default function App() {
               {isLiveDownloading ? (
                 <span><strong>Downloading Update {liveLatestVersion || ''}...</strong> ({liveDownloadProgress}%) Reloading soon</span>
               ) : (
-                <span><strong>Tabby Update {liveLatestVersion || 'v1.2'} Available!</strong> Click to update & reload with the latest features.</span>
+                <span><strong>Tabby Update {liveLatestVersion ? `${liveLatestVersion} ` : ''}Available!</strong> Click to update & reload with the latest features.</span>
               )}
             </span>
           </div>

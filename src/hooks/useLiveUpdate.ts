@@ -40,12 +40,12 @@ export function useLiveUpdate(): LiveUpdateState {
   const checkForUpdate = useCallback(async (isManualCheck: boolean = false) => {
     try {
       setError(null);
-      // Fetch latest GitHub release metadata
-      const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      // Fetch latest GitHub release metadata with cache-buster timestamp
+      const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest?t=${Date.now()}`, {
         headers: {
           'Accept': 'application/vnd.github.v3+json',
         },
-        cache: 'no-cache',
+        cache: 'no-store',
       });
 
       if (!response.ok) {
