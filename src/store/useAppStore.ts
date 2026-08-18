@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { User, Group, Expense, Activity, GroupCategory } from '../types';
 import {
-  saveUserToDb,
   saveGroupToDb,
   saveExpenseToDb,
   updateExpenseInDb,
@@ -10,7 +9,10 @@ import {
   updateUserProfileInDb,
   addFriendInDb,
   signOutUser,
-  syncUserData
+  syncUserData,
+  setAuthToken,
+  getAuthToken,
+  onUnauthorized
 } from '../lib/api';
 import { formatAmount } from '../utils/currency';
 import { isDemoUser, getDemoInitialData, DEMO_USERS, DEMO_GROUPS, DEMO_EXPENSES, DEMO_ACTIVITIES } from '../data/demoData';
@@ -33,7 +35,7 @@ interface AppState {
   
   initStore: () => void;
   syncWithBackend: (userId: string) => Promise<void>;
-  login: (user: User) => void;
+  login: (user: User, token: string) => void;
   logout: () => void;
   updateProfile: (updatedFields: Partial<User>) => void;
   resetData: () => void;
@@ -103,12 +105,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   initStore: () => {
+    // Any 401 from the backend (expired/invalid token) drops the app back to
+    // the login screen instead of spinning on failed requests forever.
+    onUnauthorized(() => get().logout());
+
     try {
       const savedCurrency = localStorage.getItem('splitwise_currency');
       if (savedCurrency) set({ currency: savedCurrency });
 
       const rawUser = localStorage.getItem('splitwise_user');
-      if (rawUser) {
+      const token = getAuthToken();
+
+      // A cached user with no token means this is a session from before
+      // authenticated sync existed (or a corrupted/cleared token) - it can't
+      // be restored, so require a fresh sign-in rather than showing stale
+      // local data the backend will now reject.
+      if (rawUser && token) {
         const user = JSON.parse(rawUser) as User;
         const initial = loadUserData(user);
         set({
@@ -119,6 +131,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           activities: initial.activities,
         });
         get().syncWithBackend(user.id);
+      } else if (rawUser && !token) {
+        localStorage.removeItem('splitwise_user');
       }
     } catch (e) {
       console.error('Failed to initialize store:', e);
@@ -127,8 +141,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   syncWithBackend: async (userId: string) => {
     const isDemo = isDemoUser(userId);
-    const data = await syncUserData(userId);
-    
+    const data = await syncUserData();
+
     if (data) {
       set((state) => {
         // If demo user and server returned empty groups, keep demo initial data
@@ -167,7 +181,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  login: (user) => {
+  login: (user, token) => {
     const isDemo = isDemoUser(user.id);
     let initialData: { users: User[]; groups: Group[]; expenses: Expense[]; activities: Activity[] };
 
@@ -177,6 +191,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       initialData = loadUserData(user);
     }
 
+    setAuthToken(token);
     localStorage.setItem('splitwise_user', JSON.stringify(user));
     persistUserData(user.id, initialData);
 
@@ -188,7 +203,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       activities: initialData.activities,
     });
 
-    saveUserToDb(user);
+    // The auth endpoint that produced `user` (login/register/google/demo)
+    // already persisted the authoritative record server-side - no separate
+    // "save user" call is needed (or safe: that call used to be an
+    // unauthenticated mass-assignment upsert, now removed).
     get().syncWithBackend(user.id);
   },
 
@@ -210,7 +228,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     
     const updatedUser = { ...currentUser, ...updatedFields };
     localStorage.setItem('splitwise_user', JSON.stringify(updatedUser));
-    updateUserProfileInDb(currentUser.id, updatedFields);
+    updateUserProfileInDb(updatedFields);
     
     const updatedUsers = users.map((u) => (u.id === currentUser.id ? updatedUser : u));
     persistUserData(currentUser.id, { users: updatedUsers, groups, expenses, activities });
@@ -296,7 +314,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ users: updatedUsers, currentUser: updatedUser, activities: updatedActs });
 
     // Sync to DB
-    addFriendInDb(currentUser.id, name, email);
+    addFriendInDb(name, email);
     saveActivityToDb(newAct);
   },
 

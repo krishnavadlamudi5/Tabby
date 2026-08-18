@@ -1,19 +1,16 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { Group } from '../models/Group';
+import { requireAuth, AuthedRequest } from '../middleware/auth';
 
 const router = Router();
 
-// GET /api/groups?userId=...
-router.get('/', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.query.userId as string;
-    let groups;
-    if (userId) {
-      groups = await Group.find({ members: userId }).sort({ createdAt: -1 });
-    } else {
-      groups = await Group.find().sort({ createdAt: -1 });
-    }
+router.use(requireAuth);
 
+// GET /api/groups - always scoped to the authenticated caller. The old
+// ?userId= query param let anyone read any other user's groups; it's gone.
+router.get('/', async (req: AuthedRequest, res: Response): Promise<void> => {
+  try {
+    const groups = await Group.find({ members: req.userId }).sort({ createdAt: -1 });
     res.json({ success: true, groups });
   } catch (error: any) {
     console.error('Fetch groups error:', error);
@@ -22,11 +19,27 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 // POST /api/groups (create or upsert group)
-router.post('/', async (req: Request, res: Response): Promise<void> => {
+// The caller must be a member of the group they're creating/editing, and -
+// for edits - must already be a member of the existing group. This stops an
+// outsider from creating a group that excludes themselves-as-owner or from
+// tampering with a group id they aren't part of.
+router.post('/', async (req: AuthedRequest, res: Response): Promise<void> => {
   try {
     const groupData = req.body;
     if (!groupData.id || !groupData.name) {
       res.status(400).json({ error: 'Group ID and name are required' });
+      return;
+    }
+
+    const members: string[] = Array.isArray(groupData.members) ? groupData.members : [];
+    if (!members.includes(req.userId)) {
+      res.status(403).json({ error: 'You must include yourself as a member of the group.' });
+      return;
+    }
+
+    const existing = await Group.findOne({ id: groupData.id });
+    if (existing && !existing.members.includes(req.userId as string)) {
+      res.status(403).json({ error: 'You are not a member of this group.' });
       return;
     }
 

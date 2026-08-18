@@ -1,12 +1,70 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import rateLimit from 'express-rate-limit';
 import { User } from '../models/User';
 import { Group } from '../models/Group';
 import { Expense } from '../models/Expense';
 import { Activity } from '../models/Activity';
 import { sendEmailOtp, sendSmsOtp } from '../services/notificationService';
+import { signToken } from '../middleware/auth';
 
 const router = Router();
+
+// ---------------------------------------------------------------------------
+// Rate limiting
+//
+// Previously every /api/auth/* route (most importantly send-otp and
+// verify-otp) had no throttling at all: a code is only 6 digits (1e6
+// possibilities) and was valid for 10 minutes with unlimited guesses, and
+// send-otp could be hit with an arbitrary destination with no limit -
+// letting anyone email/SMS-bomb a victim for free. Two layers here:
+//  1. IP-based rate limits (below) blunt both brute force and bombing from
+//     any single source.
+//  2. A per-destination attempt cap on the OTP entry itself (see
+//     verify-otp/register) blunts distributed brute force that spreads
+//     requests across many IPs against one target.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60, // generous ceiling for the whole auth surface
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again later.' },
+});
+const sendOtpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5, // at most 5 codes requested per IP per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many verification code requests. Please wait a few minutes and try again.' },
+});
+const verifyOtpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, // at most 20 verification attempts per IP per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please wait a few minutes and try again.' },
+});
+// Applied per-route below (not router-wide) - the mobile Google handoff polls
+// GET /mobile-session/:sessionId every 2.5s for up to 10 minutes while
+// waiting for the system browser, which would blow through a router-wide
+// limit on its own and break that sign-in flow.
+
+// Ids allowed to use the zero-friction "1-click demo" login. Real accounts are
+// never in this list, so this can't be used to bypass auth for anyone else -
+// it just issues a normal session token for these specific seeded accounts.
+const DEMO_USER_IDS = new Set(['user-alex', 'user-sarah']);
+
+// Fields safe to hand back to a client - never the password hash.
+function toPublicUser(user: any) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    avatar: user.avatar,
+    friendIds: user.friendIds,
+  };
+}
 
 // In-memory OTP storage with timestamp (TTL: 10 minutes)
 interface OtpEntry {
@@ -14,8 +72,23 @@ interface OtpEntry {
   destination: string;
   expiresAt: number;
   type: 'register' | 'reset';
+  attempts: number;
 }
 const otpStore = new Map<string, OtpEntry>();
+const MAX_OTP_ATTEMPTS = 5;
+
+// Records one failed verification attempt against a stored OTP and evicts it
+// once too many wrong guesses have been made - even spread across many IPs,
+// a code can't be brute forced more than MAX_OTP_ATTEMPTS times.
+function registerFailedOtpAttempt(key: string, entry: OtpEntry): boolean {
+  entry.attempts += 1;
+  if (entry.attempts >= MAX_OTP_ATTEMPTS) {
+    otpStore.delete(key);
+    return true; // locked out
+  }
+  otpStore.set(key, entry);
+  return false;
+}
 
 // Clean expired OTPs every 5 minutes
 setInterval(() => {
@@ -103,7 +176,7 @@ function getPhoneQuery(phoneInput: string) {
 }
 
 // POST /api/auth/send-otp (Send 6-digit verification code for register or reset)
-router.post('/send-otp', async (req: Request, res: Response): Promise<void> => {
+router.post('/send-otp', sendOtpLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
     const { destination, type = 'register' } = req.body;
     if (!destination || !destination.trim()) {
@@ -137,7 +210,8 @@ router.post('/send-otp', async (req: Request, res: Response): Promise<void> => {
       code,
       destination: key,
       expiresAt,
-      type: type as 'register' | 'reset'
+      type: type as 'register' | 'reset',
+      attempts: 0
     });
 
     // Dispatch real email or SMS notification
@@ -159,7 +233,7 @@ router.post('/send-otp', async (req: Request, res: Response): Promise<void> => {
 });
 
 // POST /api/auth/verify-otp (Verify OTP)
-router.post('/verify-otp', async (req: Request, res: Response): Promise<void> => {
+router.post('/verify-otp', verifyOtpLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
     const { destination, code } = req.body;
     if (!destination || !code) {
@@ -182,7 +256,12 @@ router.post('/verify-otp', async (req: Request, res: Response): Promise<void> =>
     }
 
     if (entry.code !== code.trim()) {
-      res.status(400).json({ error: 'Invalid verification code. Please check and try again.' });
+      const lockedOut = registerFailedOtpAttempt(key, entry);
+      res.status(400).json({
+        error: lockedOut
+          ? 'Too many incorrect attempts. Please request a new verification code.'
+          : 'Invalid verification code. Please check and try again.'
+      });
       return;
     }
 
@@ -194,7 +273,7 @@ router.post('/verify-otp', async (req: Request, res: Response): Promise<void> =>
 });
 
 // POST /api/auth/reset-password (Reset password after OTP verification)
-router.post('/reset-password', async (req: Request, res: Response): Promise<void> => {
+router.post('/reset-password', verifyOtpLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
     const { destination, code, newPassword } = req.body;
     if (!destination || !code || !newPassword) {
@@ -210,8 +289,22 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
     const key = destination.trim().toLowerCase();
     const entry = otpStore.get(key);
 
-    if (!entry || entry.code !== code.trim()) {
+    if (!entry) {
       res.status(400).json({ error: 'Invalid or expired OTP code' });
+      return;
+    }
+    if (Date.now() > entry.expiresAt) {
+      otpStore.delete(key);
+      res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
+      return;
+    }
+    if (entry.code !== code.trim()) {
+      const lockedOut = registerFailedOtpAttempt(key, entry);
+      res.status(400).json({
+        error: lockedOut
+          ? 'Too many incorrect attempts. Please request a new verification code.'
+          : 'Invalid or expired OTP code'
+      });
       return;
     }
 
@@ -230,21 +323,17 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
+    // Setting a real password makes this a password-loginable account.
+    // Covers both "forgot password" for an existing local account and a
+    // ghost placeholder claiming their account for the first time.
+    user.authProvider = 'local';
     await user.save();
 
     // Invalidate OTP
     otpStore.delete(key);
 
-    const userObj = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      avatar: user.avatar,
-      friendIds: user.friendIds
-    };
-
-    res.json({ success: true, message: 'Password updated successfully', user: userObj });
+    const token = signToken(user.id);
+    res.json({ success: true, message: 'Password updated successfully', user: toPublicUser(user), token });
   } catch (error: any) {
     console.error('Reset password error:', error);
     res.status(500).json({ error: error.message || 'Failed to reset password' });
@@ -252,28 +341,58 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
 });
 
 // POST /api/auth/register (Create account with OTP check)
-router.post('/register', async (req: Request, res: Response): Promise<void> => {
+router.post('/register', verifyOtpLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, email, phone, password, otp } = req.body;
     if (!name || !email) {
       res.status(400).json({ error: 'Name and email are required' });
       return;
     }
+    // Server-side password policy - the client already enforces this, but the
+    // API must never trust that. A 'local' account with no/weak password is
+    // either unusable or an easy target, so reject it here regardless of what
+    // the client sent.
+    if (typeof password !== 'string' || password.length < 6) {
+      res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+      return;
+    }
 
     const normalizedEmail = email.toLowerCase().trim();
-    
-    // If OTP provided, verify it
-    if (otp) {
-      const entry = otpStore.get(normalizedEmail) || (phone ? otpStore.get(phone.trim().toLowerCase()) : null);
-      if (entry && entry.code !== otp.trim()) {
-        res.status(400).json({ error: 'Invalid verification OTP code. Please check and try again.' });
-        return;
-      }
-      if (entry) {
-        otpStore.delete(normalizedEmail);
-        if (phone) otpStore.delete(phone.trim().toLowerCase());
-      }
+
+    // OTP is mandatory, not optional - previously this whole block only ran
+    // `if (otp)`, and even then only rejected on a *mismatch*: if no entry
+    // existed at all (send-otp was never called, or it had already expired),
+    // the check silently passed and the account was created with the email
+    // never actually verified. Now a missing/expired/mismatched code always
+    // rejects registration.
+    if (!otp || !otp.trim()) {
+      res.status(400).json({ error: 'A verification code is required. Please request one first.' });
+      return;
     }
+    const otpKey = normalizedEmail;
+    const phoneKey = phone ? phone.trim().toLowerCase() : null;
+    const entry = otpStore.get(otpKey) || (phoneKey ? otpStore.get(phoneKey) : null);
+    const matchedKey = otpStore.has(otpKey) ? otpKey : (phoneKey && otpStore.has(phoneKey) ? phoneKey : null);
+
+    if (!entry || !matchedKey) {
+      res.status(400).json({ error: 'Verification code expired or not requested. Please resend.' });
+      return;
+    }
+    if (Date.now() > entry.expiresAt) {
+      otpStore.delete(matchedKey);
+      res.status(400).json({ error: 'Verification code has expired. Please request a new one.' });
+      return;
+    }
+    if (entry.code !== otp.trim()) {
+      const lockedOut = registerFailedOtpAttempt(matchedKey, entry);
+      res.status(400).json({
+        error: lockedOut
+          ? 'Too many incorrect attempts. Please request a new verification code.'
+          : 'Invalid verification OTP code. Please check and try again.'
+      });
+      return;
+    }
+    otpStore.delete(matchedKey);
 
     const existingUser = await User.findOne({ email: normalizedEmail });
 
@@ -291,6 +410,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
       existingUser.name = name.trim();
       existingUser.phone = phone || existingUser.phone;
       if (hashedPassword) existingUser.password = hashedPassword;
+      existingUser.authProvider = 'local';
       if (!existingUser.avatar) existingUser.avatar = avatar;
       userDoc = await existingUser.save();
     } else {
@@ -300,6 +420,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
         email: normalizedEmail,
         phone: phone || '',
         password: hashedPassword,
+        authProvider: 'local',
         avatar,
         friendIds: [],
         createdAt: new Date().toISOString()
@@ -308,16 +429,8 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
 
     await linkGhostUser(userId, normalizedEmail, phone);
 
-    const userObj = {
-      id: userDoc.id,
-      name: userDoc.name,
-      email: userDoc.email,
-      phone: userDoc.phone,
-      avatar: userDoc.avatar,
-      friendIds: userDoc.friendIds
-    };
-
-    res.json({ success: true, user: userObj });
+    const token = signToken(userDoc.id);
+    res.json({ success: true, user: toPublicUser(userDoc), token });
   } catch (error: any) {
     console.error('Registration error:', error);
     res.status(500).json({ error: error.message || 'Registration failed' });
@@ -325,7 +438,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
 });
 
 // POST /api/auth/login (Sign In with Email/Phone + Password)
-router.post('/login', async (req: Request, res: Response): Promise<void> => {
+router.post('/login', authLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
     const { identifier, password } = req.body;
     if (!identifier) {
@@ -336,11 +449,12 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     const trimmed = identifier.trim();
     let user = null;
 
+    // .select('+password') is required - the schema hides the hash by default.
     if (trimmed.includes('@')) {
-      user = await User.findOne({ email: trimmed.toLowerCase() });
+      user = await User.findOne({ email: trimmed.toLowerCase() }).select('+password');
     } else {
       const phoneConditions = getPhoneQuery(trimmed);
-      user = await User.findOne({ $or: phoneConditions });
+      user = await User.findOne({ $or: phoneConditions }).select('+password');
     }
 
     if (!user) {
@@ -348,24 +462,49 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (user.password && password) {
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
-        res.status(401).json({ error: 'Incorrect password. Please try again or reset your password.' });
-        return;
-      }
+    // Explicit provider check - never infer "no password required" from a
+    // falsy field, since that also matches "field was never set". Legacy
+    // documents created before `authProvider` existed are classified from
+    // whether they have a password hash, and the classification is written
+    // back so every future login for that account is unambiguous.
+    let provider = user.authProvider;
+    if (!provider) {
+      provider = user.password ? 'local' : 'ghost';
+      user.authProvider = provider;
+      user.save().catch((e) => console.warn('authProvider backfill failed:', e));
     }
 
-    const userObj = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      avatar: user.avatar,
-      friendIds: user.friendIds
-    };
+    if (provider === 'ghost') {
+      res.status(403).json({ error: 'This contact has not created a Tabby account yet. Ask them to sign up first.' });
+      return;
+    }
 
-    res.json({ success: true, user: userObj });
+    if (provider === 'google') {
+      res.status(401).json({ error: 'This account uses Google Sign-In. Please continue with Google instead of a password.' });
+      return;
+    }
+
+    // provider === 'local' from here on - a password match is mandatory.
+    if (!password) {
+      res.status(400).json({ error: 'Please enter your password.' });
+      return;
+    }
+    if (!user.password) {
+      // Defensive: a 'local' account should always have a hash. If it
+      // somehow doesn't, there is no password to check it against - refuse
+      // rather than silently letting the request through.
+      res.status(401).json({ error: 'This account has no password set. Please use "Forgot password" to set one.' });
+      return;
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      res.status(401).json({ error: 'Incorrect password. Please try again or reset your password.' });
+      return;
+    }
+
+    const token = signToken(user.id);
+    res.json({ success: true, user: toPublicUser(user), token });
   } catch (error: any) {
     console.error('Login error:', error);
     res.status(500).json({ error: error.message || 'Login failed' });
@@ -431,50 +570,70 @@ async function upsertGoogleUser(profile: GoogleProfile) {
       name: profile.name || 'Google User',
       email: normalizedEmail,
       avatar: profile.avatar || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
+      authProvider: 'google',
       friendIds: [],
       createdAt: new Date().toISOString()
     });
   } else {
     if (profile.name && (!user.name || user.name === 'Google User')) user.name = profile.name;
     if (profile.avatar && !user.avatar) user.avatar = profile.avatar;
+    // A verified Google login is proof of email ownership - it's safe to
+    // upgrade a placeholder ('ghost') account here. Never downgrade an
+    // existing 'local' account; they keep their password too.
+    if (!user.authProvider || user.authProvider === 'ghost') user.authProvider = 'google';
     await user.save();
   }
 
   await linkGhostUser(user.id, normalizedEmail);
 
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    avatar: user.avatar,
-    friendIds: user.friendIds
-  };
+  return toPublicUser(user);
 }
 
 // POST /api/auth/google (Google Authentication)
-// Preferred body: { credential } - a Google ID token, verified server-side.
-// Legacy body: { email, name, avatar, googleId } - kept so already-installed app
-// bundles that predate token verification keep working.
-router.post('/google', async (req: Request, res: Response): Promise<void> => {
+// Requires { credential } - a Google ID token, verified server-side via
+// verifyGoogleIdToken(). A prior "legacy" fallback that trusted a raw
+// client-supplied { email } with no verification has been removed: it let
+// anyone log in as any existing account just by POSTing their email address.
+router.post('/google', authLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { credential, email, name, avatar, googleId } = req.body;
-
-    let profile: GoogleProfile;
-    if (credential) {
-      profile = await verifyGoogleIdToken(credential);
-    } else if (email) {
-      profile = { email, name, avatar, googleId };
-    } else {
+    const { credential } = req.body;
+    if (!credential) {
       res.status(400).json({ error: 'Google credential is required' });
       return;
     }
 
+    const profile = await verifyGoogleIdToken(credential);
     const userObj = await upsertGoogleUser(profile);
-    res.json({ success: true, user: userObj });
+    const token = signToken(userObj.id);
+    res.json({ success: true, user: userObj, token });
   } catch (error: any) {
     console.error('Google auth error:', error);
     res.status(500).json({ error: error.message || 'Google login failed' });
+  }
+});
+
+// POST /api/auth/demo-login - zero-friction login for the fixed, seeded demo
+// accounts shown on the login screen. Only ids in DEMO_USER_IDS are ever
+// accepted, so this cannot be used to authenticate as a real account.
+router.post('/demo-login', authLimiter, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.body;
+    if (!userId || !DEMO_USER_IDS.has(userId)) {
+      res.status(403).json({ error: 'Unknown demo account.' });
+      return;
+    }
+
+    const user = await User.findOne({ id: userId });
+    if (!user) {
+      res.status(404).json({ error: 'Demo account is not seeded yet. Please try again in a moment.' });
+      return;
+    }
+
+    const token = signToken(user.id);
+    res.json({ success: true, user: toPublicUser(user), token });
+  } catch (error: any) {
+    console.error('Demo login error:', error);
+    res.status(500).json({ error: error.message || 'Demo login failed' });
   }
 });
 
@@ -491,6 +650,7 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
 interface MobileSession {
   status: 'pending' | 'complete';
   user?: any;
+  token?: string;
   expiresAt: number;
 }
 const mobileSessions = new Map<string, MobileSession>();
@@ -511,7 +671,7 @@ function publicBaseUrl(req: Request) {
 }
 
 // POST /api/auth/mobile-session/start - app asks for a handoff URL
-router.post('/mobile-session/start', async (req: Request, res: Response): Promise<void> => {
+router.post('/mobile-session/start', authLimiter, async (req: Request, res: Response): Promise<void> => {
   const sessionId = `ms_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 12)}`;
   mobileSessions.set(sessionId, { status: 'pending', expiresAt: Date.now() + MOBILE_SESSION_TTL });
   res.json({
@@ -540,9 +700,11 @@ router.post('/mobile-session/complete', async (req: Request, res: Response): Pro
 
     const profile = await verifyGoogleIdToken(credential);
     const userObj = await upsertGoogleUser(profile);
+    const token = signToken(userObj.id);
 
     entry.status = 'complete';
     entry.user = userObj;
+    entry.token = token;
     mobileSessions.set(sessionId, entry);
 
     res.json({ success: true, name: userObj.name, email: userObj.email });
@@ -562,7 +724,7 @@ router.get('/mobile-session/:sessionId', async (req: Request, res: Response): Pr
   }
   if (entry.status === 'complete') {
     mobileSessions.delete(req.params.sessionId); // single use
-    res.json({ status: 'complete', user: entry.user });
+    res.json({ status: 'complete', user: entry.user, token: entry.token });
     return;
   }
   res.json({ status: 'pending' });

@@ -1,23 +1,20 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { Activity } from '../models/Activity';
+import { requireAuth, AuthedRequest } from '../middleware/auth';
 
 const router = Router();
 
-// GET /api/activities?userId=...
-router.get('/', async (req: Request, res: Response): Promise<void> => {
+router.use(requireAuth);
+
+// GET /api/activities - always scoped to the authenticated caller.
+router.get('/', async (req: AuthedRequest, res: Response): Promise<void> => {
   try {
-    const userId = req.query.userId as string;
-    let activities;
-    if (userId) {
-      activities = await Activity.find({
-        $or: [
-          { userId },
-          { type: 'app_update' }
-        ]
-      }).sort({ timestamp: -1 }).limit(100);
-    } else {
-      activities = await Activity.find().sort({ timestamp: -1 }).limit(100);
-    }
+    const activities = await Activity.find({
+      $or: [
+        { userId: req.userId },
+        { type: 'app_update' }
+      ]
+    }).sort({ timestamp: -1 }).limit(100);
 
     res.json({ success: true, activities });
   } catch (error: any) {
@@ -27,9 +24,11 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 // POST /api/activities (create activity)
-router.post('/', async (req: Request, res: Response): Promise<void> => {
+// userId is always the authenticated caller - a client can no longer log an
+// activity as if it were performed by someone else.
+router.post('/', async (req: AuthedRequest, res: Response): Promise<void> => {
   try {
-    const actData = req.body;
+    const actData = { ...req.body, userId: req.userId };
     if (!actData.id || !actData.description) {
       res.status(400).json({ error: 'id and description are required' });
       return;

@@ -61,27 +61,30 @@ export default function ExpenseModal({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
 
-  // Update eligible users when Group selection or Friend selection changes
-  useEffect(() => {
-    if (groupId && groupId !== 'none') {
-      const selectedGroup = groups.find((g) => g.id === groupId);
-      if (selectedGroup) {
-        // Group members
-        const members = allUsers.filter((u) => selectedGroup.members.includes(u.id));
-        setEligibleUsers(members);
-        setIncludedUserIds(members.map((m) => m.id));
-      }
-    } else {
-      // Non-group: split between current user and selected friend
-      const activeFriendId = friendId !== 'none' ? friendId : (friends[0]?.id || '');
-      const members = [currentUser];
-      const selectedFriend = friends.find((f) => f.id === activeFriendId);
-      if (selectedFriend) {
-        members.push(selectedFriend);
-      }
-      setEligibleUsers(members);
-      setIncludedUserIds(members.map((m) => m.id));
+  // Shared "who's in this split by default" logic - used both to derive the
+  // candidate pool (eligibleUsers, below) and, explicitly from the
+  // group/friend selectors and the initial-load effect, to default
+  // includedUserIds. It's intentionally NOT also called from an effect keyed
+  // on [groupId, friendId, ...] to reset includedUserIds automatically: that
+  // used to fire right after the existing-expense loader sets the real saved
+  // subset of participants (loading a group expense changes groupId too),
+  // silently re-including everyone the instant the correct subset was set.
+  const computeMembers = (gid: string | 'none', fid: string | 'none'): User[] => {
+    if (gid && gid !== 'none') {
+      const selectedGroup = groups.find((g) => g.id === gid);
+      return selectedGroup ? allUsers.filter((u) => selectedGroup.members.includes(u.id)) : [];
     }
+    const activeFriendId = fid !== 'none' ? fid : (friends[0]?.id || '');
+    const members = [currentUser];
+    const selectedFriend = friends.find((f) => f.id === activeFriendId);
+    if (selectedFriend) members.push(selectedFriend);
+    return members;
+  };
+
+  // Update the candidate pool (who CAN be split with) when Group/Friend
+  // selection changes. Does not touch includedUserIds - see comment above.
+  useEffect(() => {
+    setEligibleUsers(computeMembers(groupId, friendId));
   }, [groupId, friendId, groups, friends, currentUser, allUsers]);
 
   // Handle setting initial group, friend, or existing expense data on modal open
@@ -110,28 +113,34 @@ export default function ExpenseModal({
           setCustomInputs(inputs);
         }
       } else {
-        setGroupId(initialGroupId || 'none');
-        setFriendId(initialFriendId || 'none');
+        const newGroupId = initialGroupId || 'none';
+        const newFriendId = initialFriendId || 'none';
+        setGroupId(newGroupId);
+        setFriendId(newFriendId);
         setDescription('');
         setAmountStr('');
         setPaidBy(currentUser.id);
         setSplitMethod('equally');
         setCategory('other');
         setDate(new Date().toISOString().split('T')[0]);
+        // Default to everyone in the initial group/friend scope.
+        setIncludedUserIds(computeMembers(newGroupId, newFriendId).map((m) => m.id));
+        // Clear any exact/percentage values left over from editing a
+        // different expense in a previous open of this same modal instance.
+        setCustomInputs({});
       }
       setValidationError(null);
     }
   }, [isOpen, initialGroupId, initialFriendId, currentUser.id, existingExpense]);
 
-  // Reset custom inputs when splitMethod or eligibleUsers changes
-  useEffect(() => {
-    const initialInputs: Record<string, string> = {};
-    eligibleUsers.forEach((u) => {
-      initialInputs[u.id] = '';
-    });
-    setCustomInputs(initialInputs);
-    setValidationError(null);
-  }, [splitMethod, eligibleUsers]);
+  // customInputs is intentionally NOT auto-reset by an effect keyed on
+  // [splitMethod, eligibleUsers]: that used to run right after the effect
+  // above loads a saved exact/percentage expense (loading the group or the
+  // split method also changes those same dependencies), which cleared the
+  // values back to blank the instant they were set. Instead, customInputs is
+  // reset explicitly wherever the user actually changes something that makes
+  // the old values meaningless - the group/friend selectors and the split
+  // method selector below - so a programmatic load is never clobbered.
 
   const totalAmount = parseFloat(amountStr) || 0;
 
@@ -430,10 +439,17 @@ export default function ExpenseModal({
                   id="group-select"
                   value={groupId}
                   onChange={(e) => {
-                    setGroupId(e.target.value);
-                    if (e.target.value !== 'none') {
+                    const newGroupId = e.target.value;
+                    const newFriendId = newGroupId !== 'none' ? 'none' : friendId;
+                    setGroupId(newGroupId);
+                    if (newGroupId !== 'none') {
                       setFriendId('none');
                     }
+                    // A different group means a different set of people -
+                    // default to everyone in it, and clear any exact/
+                    // percentage values already typed for the old set.
+                    setIncludedUserIds(computeMembers(newGroupId, newFriendId).map((m) => m.id));
+                    setCustomInputs({});
                   }}
                   className="w-full pl-3 pr-8 py-2 border border-[#E6E1DA] rounded-xl text-xs appearance-none bg-white focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] transition-colors text-[#2C2B29]"
                 >
@@ -455,7 +471,15 @@ export default function ExpenseModal({
                   <select
                     id="friend-select"
                     value={friendId}
-                    onChange={(e) => setFriendId(e.target.value)}
+                    onChange={(e) => {
+                      const newFriendId = e.target.value;
+                      setFriendId(newFriendId);
+                      // A different friend means default to splitting with
+                      // just the two of you, and clear stale exact/
+                      // percentage values from the old friend.
+                      setIncludedUserIds(computeMembers(groupId, newFriendId).map((m) => m.id));
+                      setCustomInputs({});
+                    }}
                     className="w-full pl-3 pr-8 py-2 border border-[#E6E1DA] rounded-xl text-xs appearance-none bg-white focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] transition-colors text-[#2C2B29]"
                   >
                     {friends.map((f) => (
@@ -564,7 +588,12 @@ export default function ExpenseModal({
                 <div className="relative inline-block">
                   <select
                     value={splitMethod}
-                    onChange={(e) => setSplitMethod(e.target.value as SplitMethod)}
+                    onChange={(e) => {
+                      setSplitMethod(e.target.value as SplitMethod);
+                      // Dollar amounts don't carry over as percentages (or vice
+                      // versa), so clear whatever was typed for the old method.
+                      setCustomInputs({});
+                    }}
                     className="pl-2.5 pr-8 py-1.5 bg-[#FAF8F5] border border-[#E6E1DA] rounded-lg text-xs sm:text-sm font-semibold text-[#2C2B29] appearance-none focus:outline-none focus:border-[#3C5A48] cursor-pointer"
                   >
                     <option value="equally">Equally</option>

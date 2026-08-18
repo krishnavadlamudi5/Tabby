@@ -14,7 +14,8 @@ import {
   sendOtpApi,
   resetPasswordApi,
   startMobileGoogleSession,
-  pollMobileGoogleSession
+  pollMobileGoogleSession,
+  demoLoginApi
 } from '../lib/api';
 import { 
   Sparkles, 
@@ -37,7 +38,7 @@ import {
 import AppLogo from './AppLogo';
 
 interface LoginProps {
-  onLogin: (user: User) => void;
+  onLogin: (user: User, token: string) => void;
 }
 
 const COUNTRY_CODES = [
@@ -124,14 +125,8 @@ export default function Login({ onLogin }: LoginProps) {
                   setIsLoading(true);
                   setErrorMsg('');
                   try {
-                    const user = await signInWithGoogle({
-                      credential: response.credential,
-                      email: payload.email,
-                      name: payload.name || payload.email.split('@')[0],
-                      avatar: payload.picture || `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80`,
-                      googleId: payload.sub,
-                    });
-                    onLogin(user);
+                    const { user, token } = await signInWithGoogle(response.credential);
+                    onLogin(user, token);
                   } catch (backendErr: any) {
                     console.error('GIS callback login error:', backendErr);
                     setErrorMsg(backendErr.message || 'Failed to authenticate with Google account.');
@@ -243,9 +238,9 @@ export default function Login({ onLogin }: LoginProps) {
       }
       try {
         const result = await pollMobileGoogleSession(session.sessionId);
-        if (result.status === 'complete' && result.user) {
+        if (result.status === 'complete' && result.user && result.token) {
           cancelGoogleHandoff();
-          onLogin(result.user);
+          onLogin(result.user, result.token);
         } else if (result.status === 'expired') {
           cancelGoogleHandoff();
           setErrorMsg('Google sign-in expired before it completed. Please try again.');
@@ -320,8 +315,8 @@ export default function Login({ onLogin }: LoginProps) {
 
     setIsLoading(true);
     try {
-      const user = await signInWithEmail(loginIdentifier, password);
-      onLogin(user);
+      const { user, token } = await signInWithEmail(loginIdentifier, password);
+      onLogin(user, token);
     } catch (err: any) {
       console.error('Email Sign In failed:', err);
       setErrorMsg(err.message || 'Failed to sign in. Please check your credentials.');
@@ -381,8 +376,8 @@ export default function Login({ onLogin }: LoginProps) {
 
     setIsLoading(true);
     try {
-      const user = await registerWithEmail(name.trim(), email.trim(), fullPhone, password, enteredOtp.trim());
-      onLogin(user);
+      const { user, token } = await registerWithEmail(name.trim(), email.trim(), fullPhone, password, enteredOtp.trim());
+      onLogin(user, token);
     } catch (err: any) {
       console.error('Registration error:', err);
       setErrorMsg(err.message || 'Failed to verify and create account.');
@@ -442,11 +437,27 @@ export default function Login({ onLogin }: LoginProps) {
         ? target
         : (target.startsWith('+') ? target : `${countryCode}${target.replace(/\D/g, '')}`);
       const res = await resetPasswordApi(destination, enteredOtp.trim(), newPassword);
-      
-      onLogin(res.user);
+
+      onLogin(res.user, res.token);
     } catch (err: any) {
       console.error('Reset password verification error:', err);
       setErrorMsg(err.message || 'Failed to reset password. Please check your code.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 1-click demo accounts still go through the backend so they end up with a
+  // real session token - every data route requires authentication now.
+  const handleDemoLogin = async (demoUser: User) => {
+    setErrorMsg('');
+    setIsLoading(true);
+    try {
+      const { user, token } = await demoLoginApi(demoUser.id);
+      onLogin(user, token);
+    } catch (err: any) {
+      console.error('Demo login failed:', err);
+      setErrorMsg(err.message || 'Failed to start the demo session. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -985,8 +996,9 @@ export default function Login({ onLogin }: LoginProps) {
               <button
                 key={user.id}
                 type="button"
-                onClick={() => onLogin(user)}
-                className="flex items-center gap-2.5 p-2.5 border border-[#E6E1DA] rounded-xl hover:border-[#3C5A48] hover:bg-[#EBF1ED]/40 transition-all text-left group cursor-pointer bg-[#FAF8F5]/30"
+                disabled={isLoading}
+                onClick={() => handleDemoLogin(user)}
+                className="flex items-center gap-2.5 p-2.5 border border-[#E6E1DA] rounded-xl hover:border-[#3C5A48] hover:bg-[#EBF1ED]/40 transition-all text-left group cursor-pointer bg-[#FAF8F5]/30 disabled:opacity-60 disabled:cursor-not-allowed"
                 id={`demo-user-btn-${user.id}`}
               >
                 <img

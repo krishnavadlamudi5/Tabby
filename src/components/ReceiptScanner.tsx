@@ -1,13 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Camera, Upload, Loader2, Receipt, CheckCircle, AlertCircle, Sparkles } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
-
-// Initialize the Gemini client. In a real app, this should ideally be routed through your backend
-// to avoid exposing the API key, but for this demo we'll use a Vite environment variable.
-const ai = new GoogleGenAI({ 
-  apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' 
-});
+import { scanReceiptApi } from '../lib/api';
 
 interface ParsedItem {
   name: string;
@@ -50,40 +44,10 @@ export default function ReceiptScanner({ onScanComplete, onCancel }: ReceiptScan
         reader.readAsDataURL(file);
       });
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: `You are an expert receipt parsing assistant. Extract all line items, their prices, any tax, and the final total from the provided receipt image. 
-                Return the data STRICTLY as a JSON object with this exact schema (no markdown formatting, no backticks, just raw JSON):
-                {
-                  "items": [
-                    { "name": "Item Name", "price": 10.50 }
-                  ],
-                  "tax": 2.50,
-                  "total": 13.00
-                }`
-              },
-              {
-                inlineData: {
-                  mimeType: file.type,
-                  data: base64Data
-                }
-              }
-            ]
-          }
-        ]
-      });
+      // The actual Gemini call now happens server-side (server/routes/receipt.ts)
+      // so the API key never ships in the client bundle.
+      const parsedData = await scanReceiptApi(file.type, base64Data);
 
-      const resultText = response.text || '{}';
-      // Clean up potential markdown formatting from the response
-      const cleanJson = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
-      
-      const parsedData = JSON.parse(cleanJson);
-      
       if (!parsedData.items || !Array.isArray(parsedData.items)) {
         throw new Error("Could not detect items clearly. Please try again with a clearer photo.");
       }
@@ -91,12 +55,8 @@ export default function ReceiptScanner({ onScanComplete, onCancel }: ReceiptScan
       onScanComplete(parsedData.items, parsedData.total || 0, parsedData.tax || 0);
 
     } catch (err: any) {
-      console.error('Gemini Parsing Error:', err);
-      if (err.message?.includes('API key not valid')) {
-        setError('Invalid Gemini API Key. Please check your .env file.');
-      } else {
-        setError(err.message || 'Failed to parse the receipt. Please make sure the image is clear and try again.');
-      }
+      console.error('Receipt scan error:', err);
+      setError(err.message || 'Failed to parse the receipt. Please make sure the image is clear and try again.');
     } finally {
       setIsAnalyzing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

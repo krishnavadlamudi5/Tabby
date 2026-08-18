@@ -1,10 +1,30 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { User } from '../models/User';
+import { requireAuth, AuthedRequest } from '../middleware/auth';
 
 const router = Router();
 
-// GET /api/users?ids=id1,id2
-router.get('/', async (req: Request, res: Response): Promise<void> => {
+// Fields a user is allowed to change about themselves via this router.
+// id, email, password and authProvider are deliberately excluded - those
+// have their own dedicated, more carefully-guarded flows (auth.ts).
+const PROFILE_WHITELIST = ['name', 'phone', 'avatar'] as const;
+
+function pickWhitelisted(body: any): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const key of PROFILE_WHITELIST) {
+    if (body[key] !== undefined) out[key] = body[key];
+  }
+  return out;
+}
+
+// All routes below require a valid session.
+router.use(requireAuth);
+
+// GET /api/users?ids=id1,id2 - used to resolve names/avatars for friends and
+// group members. Read-only and deliberately not restricted to "my" ids
+// (any signed-in user can look up public profile fields for anyone they
+// already know the id of), but the password hash is never selected/returned.
+router.get('/', async (req: AuthedRequest, res: Response): Promise<void> => {
   try {
     const idsQuery = req.query.ids as string;
     let users;
@@ -22,36 +42,45 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// POST /api/users (upsert/save user)
-router.post('/', async (req: Request, res: Response): Promise<void> => {
+// PUT /api/users/me (update own profile)
+// Replaces the old unauthenticated POST / upsert, which let any caller
+// overwrite any user document (including the password field) just by
+// supplying an id. Only the caller's own row, and only whitelisted fields,
+// can ever be touched here.
+router.put('/me', async (req: AuthedRequest, res: Response): Promise<void> => {
   try {
-    const userData = req.body;
-    if (!userData.id) {
-      res.status(400).json({ error: 'User ID is required' });
+    const updates = pickWhitelisted(req.body);
+    const user = await User.findOneAndUpdate(
+      { id: req.userId },
+      { $set: updates },
+      { new: true }
+    );
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
       return;
     }
 
-    const updated = await User.findOneAndUpdate(
-      { id: userData.id },
-      { $set: userData },
-      { upsert: true, new: true }
-    );
-
-    res.json({ success: true, user: updated });
+    res.json({ success: true, user });
   } catch (error: any) {
-    console.error('Save user error:', error);
-    res.status(500).json({ error: error.message || 'Failed to save user' });
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: error.message || 'Failed to update profile' });
   }
 });
 
-// PUT /api/users/:id (update profile)
-router.put('/:id', async (req: Request, res: Response): Promise<void> => {
+// PUT /api/users/:id - kept for backward compatibility with the shape the
+// frontend historically used, but it can only ever target the caller's own
+// account (mismatched ids are rejected) and only whitelisted fields apply.
+router.put('/:id', async (req: AuthedRequest, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
-    const updates = req.body;
+    if (req.params.id !== req.userId) {
+      res.status(403).json({ error: 'You can only update your own profile.' });
+      return;
+    }
 
+    const updates = pickWhitelisted(req.body);
     const user = await User.findOneAndUpdate(
-      { id },
+      { id: req.userId },
       { $set: updates },
       { new: true }
     );
@@ -69,11 +98,15 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
 });
 
 // POST /api/users/friend (add a friend)
-router.post('/friend', async (req: Request, res: Response): Promise<void> => {
+// currentUserId is now always taken from the authenticated session, never
+// the request body, so a caller can no longer add friends onto someone
+// else's account.
+router.post('/friend', async (req: AuthedRequest, res: Response): Promise<void> => {
   try {
-    const { currentUserId, name, email } = req.body;
-    if (!currentUserId || !name) {
-      res.status(400).json({ error: 'currentUserId and name are required' });
+    const { name, email } = req.body;
+    const currentUserId = req.userId as string;
+    if (!name) {
+      res.status(400).json({ error: 'name is required' });
       return;
     }
 
@@ -92,6 +125,7 @@ router.post('/friend', async (req: Request, res: Response): Promise<void> => {
         name: name.trim(),
         email: cleanEmail || `${friendId}@tabby.local`,
         avatar,
+        authProvider: 'ghost',
         friendIds: [currentUserId],
         createdAt: new Date().toISOString()
       });

@@ -25,6 +25,8 @@ export interface LiveUpdateState {
 const GITHUB_REPO = 'krishnavadlamudi5/Tabby';
 const STORAGE_CURRENT_VERSION_KEY = 'tabby_app_active_version';
 const STORAGE_DISMISSED_VERSION_KEY = 'tabby_dismissed_update_version';
+const STORAGE_RELEASE_ETAG_KEY = 'tabby_gh_release_etag';
+const STORAGE_RELEASE_CACHE_KEY = 'tabby_gh_release_cache';
 
 /**
  * Resolves any HTTP 301/302 redirects to obtain the direct asset URL (e.g. AWS/Azure CDN link from GitHub Release).
@@ -100,23 +102,44 @@ export function useLiveUpdate(): LiveUpdateState {
   const checkForUpdate = useCallback(async (isManualCheck: boolean = false) => {
     try {
       setError(null);
-      // Fetch latest GitHub release metadata with cache-buster timestamp
-      const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest?t=${Date.now()}`, {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-        },
+
+      // Conditional request via ETag instead of a `?t=` cache-buster: GitHub
+      // still re-validates freshness on every call (so this is never stale),
+      // but a 304 response does NOT count against the unauthenticated
+      // rate limit (60/hr per IP) the way a full 200 always does. That limit
+      // is shared across every device polling from behind the same IP
+      // (office/campus NAT, carrier-grade NAT, etc.) every 15 minutes, so
+      // this materially reduces the odds of update checks silently failing
+      // once a handful of users share an egress IP.
+      const storedEtag = localStorage.getItem(STORAGE_RELEASE_ETAG_KEY);
+      const headers: Record<string, string> = { Accept: 'application/vnd.github.v3+json' };
+      if (storedEtag) headers['If-None-Match'] = storedEtag;
+
+      const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+        headers,
         cache: 'no-store',
       });
 
-      if (!response.ok) {
+      let release: any;
+      if (response.status === 304) {
+        // Not modified - reuse the last release payload we cached alongside its ETag.
+        const cached = localStorage.getItem(STORAGE_RELEASE_CACHE_KEY);
+        if (!cached) return; // nothing to compare against yet; wait for the next full fetch
+        release = JSON.parse(cached);
+      } else if (!response.ok) {
         // If 404 (no releases yet) or rate-limited, skip silently unless manual check
         if (isManualCheck) {
           setError(response.status === 404 ? 'No updates found on GitHub yet.' : 'GitHub check limit reached. Please try later.');
         }
         return;
+      } else {
+        release = await response.json();
+        const newEtag = response.headers.get('ETag');
+        if (newEtag) {
+          localStorage.setItem(STORAGE_RELEASE_ETAG_KEY, newEtag);
+          localStorage.setItem(STORAGE_RELEASE_CACHE_KEY, JSON.stringify(release));
+        }
       }
-
-      const release = await response.json();
       const remoteVersion = release.tag_name || release.name;
       const zipAsset = release.assets?.find((asset: { name: string; browser_download_url: string }) => asset.name === 'dist.zip');
 

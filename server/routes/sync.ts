@@ -1,22 +1,32 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { User } from '../models/User';
 import { Group } from '../models/Group';
 import { Expense } from '../models/Expense';
 import { Activity } from '../models/Activity';
 import { seedDemoData } from '../seedDemo';
+import { requireAuth, AuthedRequest } from '../middleware/auth';
 
 const router = Router();
 
-// GET /api/sync/:userId - Fast unified sync
-router.get('/:userId', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { userId } = req.params;
-    if (!userId) {
-      res.status(400).json({ error: 'User ID is required' });
-      return;
-    }
+router.use(requireAuth);
 
-    // Auto-seed demo data if demo user requested and not yet seeded
+// GET /api/sync/me - fast unified sync for the authenticated caller only.
+// The old GET /api/sync/:userId let anyone pull any other user's full
+// profile, groups, expenses and activities just by knowing/guessing their
+// id. There is no legitimate reason to sync anyone but yourself, so the
+// param is gone entirely.
+router.get('/me', async (req: AuthedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId as string;
+
+    // Auto-seed demo data only for the fixed demo accounts, and only once.
+    // This used to be reachable by anyone who could guess 'user-alex' as a
+    // query param on the old public GET /api/sync/:userId. Now that this
+    // route requires a valid session (router.use(requireAuth) above), the
+    // only way to hold a token for these ids at all is via
+    // POST /api/auth/demo-login, which only ever issues one for this exact
+    // allowlist - so this check is effectively also access-controlled, not
+    // just a data-shape check.
     if (userId === 'user-alex' || userId === 'user-sarah') {
       const demoCount = await Group.countDocuments({ members: userId });
       if (demoCount === 0) {

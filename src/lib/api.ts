@@ -1,10 +1,47 @@
 import { User, Group, Expense, Activity } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const TOKEN_STORAGE_KEY = 'tabby_auth_token';
+
+// --- Session token -----------------------------------------------------
+// The backend now requires a Bearer token on every data route. The token is
+// kept in localStorage alongside the cached user object (see useAppStore),
+// and every request() call attaches it automatically.
+
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string | null): void {
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // localStorage unavailable (private mode, etc.) - session just won't persist.
+  }
+}
+
+// Called when the backend rejects the current token (expired/invalid) so the
+// app can drop back to the login screen instead of silently failing every
+// request. Wired up by the store on startup.
+let unauthorizedHandler: (() => void) | null = null;
+export function onUnauthorized(handler: () => void): void {
+  unauthorizedHandler = handler;
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const headers = {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...((options.headers as Record<string, string>) || {}),
   };
 
   try {
@@ -15,6 +52,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
     const data = await res.json();
     if (!res.ok) {
+      if (res.status === 401 && unauthorizedHandler) {
+        unauthorizedHandler();
+      }
       throw new Error(data.error || `HTTP error! status: ${res.status}`);
     }
     return data as T;
@@ -39,19 +79,25 @@ export async function verifyOtpApi(destination: string, code: string): Promise<{
   });
 }
 
-export async function resetPasswordApi(destination: string, code: string, newPassword: string): Promise<{ success: boolean; user: User }> {
-  return await request('/auth/reset-password', {
+export interface AuthResult {
+  user: User;
+  token: string;
+}
+
+export async function resetPasswordApi(destination: string, code: string, newPassword: string): Promise<AuthResult> {
+  const data = await request<{ success: boolean; user: User; token: string }>('/auth/reset-password', {
     method: 'POST',
     body: JSON.stringify({ destination, code, newPassword }),
   });
+  return { user: data.user, token: data.token };
 }
 
-export async function signInWithEmail(identifier: string, passwordVal: string): Promise<User> {
-  const data = await request<{ success: boolean; user: User }>('/auth/login', {
+export async function signInWithEmail(identifier: string, passwordVal: string): Promise<AuthResult> {
+  const data = await request<{ success: boolean; user: User; token: string }>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ identifier, password: passwordVal }),
   });
-  return data.user;
+  return { user: data.user, token: data.token };
 }
 
 export async function registerWithEmail(
@@ -60,8 +106,8 @@ export async function registerWithEmail(
   phoneVal: string,
   passwordVal: string,
   otpVal?: string
-): Promise<User> {
-  const data = await request<{ success: boolean; user: User }>('/auth/register', {
+): Promise<AuthResult> {
+  const data = await request<{ success: boolean; user: User; token: string }>('/auth/register', {
     method: 'POST',
     body: JSON.stringify({
       name: nameVal,
@@ -71,46 +117,29 @@ export async function registerWithEmail(
       otp: otpVal,
     }),
   });
-  return data.user;
+  return { user: data.user, token: data.token };
 }
 
-export async function signInWithGoogle(
-  customUser?: Partial<User> & { googleId?: string; credential?: string }
-): Promise<User> {
-  const email = customUser?.email || 'alex.split@gmail.com';
-  const name = customUser?.name || email.split('@')[0] || 'Google User';
-  const avatar = customUser?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80';
-  const googleId = customUser?.googleId || customUser?.id || `usr_google_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+// 1-click demo accounts. This hits a dedicated backend endpoint (rather than
+// logging in locally with no token) so demo sessions are real, authenticated
+// sessions like any other - every data route requires one now.
+export async function demoLoginApi(userId: string): Promise<AuthResult> {
+  const data = await request<{ success: boolean; user: User; token: string }>('/auth/demo-login', {
+    method: 'POST',
+    body: JSON.stringify({ userId }),
+  });
+  return { user: data.user, token: data.token };
+}
 
-  const payload = {
-    // The raw Google ID token, when we have one — the backend verifies it with
-    // Google rather than trusting the fields below.
-    credential: customUser?.credential,
-    email,
-    name,
-    avatar,
-    googleId,
-    phone: customUser?.phone || ''
-  };
-
-  try {
-    const data = await request<{ success: boolean; user: User }>('/auth/google', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-    return data.user;
-  } catch (err: any) {
-    console.warn('Backend /auth/google request failed (running in offline/direct mode):', err?.message || err);
-    // Return a valid User object so authentication succeeds seamlessly
-    return {
-      id: googleId,
-      name,
-      email,
-      avatar,
-      phone: payload.phone,
-      friendIds: customUser?.friendIds || [],
-    };
-  }
+// signInWithGoogle expects a verified Google ID token (credential) obtained
+// from Google Identity Services. There is no more "offline/demo" fallback
+// that fabricates a user client-side - the backend is the source of truth.
+export async function signInWithGoogle(credential: string): Promise<AuthResult> {
+  const data = await request<{ success: boolean; user: User; token: string }>('/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential }),
+  });
+  return { user: data.user, token: data.token };
 }
 
 // --- Mobile Google Sign-In handoff -----------------------------------------
@@ -132,29 +161,19 @@ export async function startMobileGoogleSession(): Promise<MobileGoogleSession> {
 
 export async function pollMobileGoogleSession(
   sessionId: string
-): Promise<{ status: 'pending' | 'complete' | 'expired'; user?: User }> {
+): Promise<{ status: 'pending' | 'complete' | 'expired'; user?: User; token?: string }> {
   return await request(`/auth/mobile-session/${encodeURIComponent(sessionId)}`);
 }
 
 export async function signOutUser(): Promise<void> {
   localStorage.removeItem('splitwise_user');
+  setAuthToken(null);
 }
 
 // Data persistence
-export async function saveUserToDb(user: User): Promise<void> {
+export async function updateUserProfileInDb(updates: Partial<User>): Promise<User | null> {
   try {
-    await request('/users', {
-      method: 'POST',
-      body: JSON.stringify(user),
-    });
-  } catch (e) {
-    console.error('Error saving user to DB:', e);
-  }
-}
-
-export async function updateUserProfileInDb(userId: string, updates: Partial<User>): Promise<User | null> {
-  try {
-    const data = await request<{ success: boolean; user: User }>(`/users/${userId}`, {
+    const data = await request<{ success: boolean; user: User }>('/users/me', {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
@@ -165,11 +184,11 @@ export async function updateUserProfileInDb(userId: string, updates: Partial<Use
   }
 }
 
-export async function addFriendInDb(currentUserId: string, name: string, email: string): Promise<any> {
+export async function addFriendInDb(name: string, email: string): Promise<any> {
   try {
     return await request('/users/friend', {
       method: 'POST',
-      body: JSON.stringify({ currentUserId, name, email }),
+      body: JSON.stringify({ name, email }),
     });
   } catch (e) {
     console.error('Error adding friend in DB:', e);
@@ -240,7 +259,7 @@ export interface SyncData {
   activities: Activity[];
 }
 
-export async function syncUserData(userId: string): Promise<SyncData | null> {
+export async function syncUserData(): Promise<SyncData | null> {
   try {
     const data = await request<{
       success: boolean;
@@ -249,10 +268,27 @@ export async function syncUserData(userId: string): Promise<SyncData | null> {
       groups: Group[];
       expenses: Expense[];
       activities: Activity[];
-    }>(`/sync/${userId}`);
+    }>('/sync/me');
     return data;
   } catch (e) {
     console.warn('Sync failed, using offline cache:', e);
     return null;
   }
+}
+
+// Receipt scanning - the Gemini call now runs server-side (server/routes/receipt.ts)
+// so the API key never ships in the client bundle. `data` is the base64 image
+// payload with no `data:...;base64,` prefix.
+export interface ScannedReceipt {
+  items: { name: string; price: number }[];
+  total: number;
+  tax: number;
+}
+
+export async function scanReceiptApi(mimeType: string, data: string): Promise<ScannedReceipt> {
+  const res = await request<{ success: boolean } & ScannedReceipt>('/receipt/scan', {
+    method: 'POST',
+    body: JSON.stringify({ mimeType, data }),
+  });
+  return { items: res.items, total: res.total, tax: res.tax };
 }
