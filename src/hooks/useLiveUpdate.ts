@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 export interface LiveUpdateState {
   isUpdateAvailable: boolean;
@@ -25,6 +25,54 @@ export interface LiveUpdateState {
 const GITHUB_REPO = 'krishnavadlamudi5/Tabby';
 const STORAGE_CURRENT_VERSION_KEY = 'tabby_app_active_version';
 const STORAGE_DISMISSED_VERSION_KEY = 'tabby_dismissed_update_version';
+
+/**
+ * Resolves any HTTP 301/302 redirects to obtain the direct asset URL (e.g. AWS/Azure CDN link from GitHub Release).
+ * Android's background HttpURLConnection in DownloadWorker does not automatically follow cross-domain redirects.
+ */
+async function resolveDirectDownloadUrl(initialUrl: string): Promise<string> {
+  let targetUrl = initialUrl;
+  let attempts = 0;
+  const maxRedirects = 5;
+
+  while (attempts < maxRedirects) {
+    attempts++;
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const response = await CapacitorHttp.request({
+          method: 'GET',
+          url: targetUrl,
+          headers: {
+            'Accept': 'application/octet-stream',
+          },
+          disableRedirects: true,
+          connectTimeout: 15000,
+          readTimeout: 15000,
+        });
+
+        const redirectLocation = response.headers?.location || response.headers?.Location;
+        if (redirectLocation && response.status >= 300 && response.status < 400) {
+          console.log(`[LiveUpdate] Resolved redirect (${response.status}) -> ${redirectLocation}`);
+          targetUrl = redirectLocation;
+          continue;
+        }
+
+        // If status is 200 or no more redirects, return response.url if valid
+        if (response.url && response.url !== targetUrl && response.url.startsWith('http')) {
+          targetUrl = response.url;
+        }
+        break;
+      } else {
+        break;
+      }
+    } catch (e) {
+      console.warn('[LiveUpdate] Redirect resolution attempt failed:', e);
+      break;
+    }
+  }
+
+  return targetUrl;
+}
 
 export function useLiveUpdate(): LiveUpdateState {
   const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false);
@@ -119,23 +167,46 @@ export function useLiveUpdate(): LiveUpdateState {
 
       if (Capacitor.isNativePlatform()) {
         // Native Android / iOS OTA update via CapacitorUpdater
-        console.log('[LiveUpdate] Starting download:', downloadUrl, 'version:', latestVersion);
-        setDownloadProgress(35);
+        console.log('[LiveUpdate] Initial download URL:', downloadUrl, 'version:', latestVersion);
+        setDownloadProgress(25);
+
+        // Pre-resolve any 302 redirects to direct CDN storage URL (OkHttp / AWS / Azure Blob)
+        const directAssetUrl = await resolveDirectDownloadUrl(downloadUrl);
+        console.log('[LiveUpdate] Direct asset download URL:', directAssetUrl);
+        setDownloadProgress(45);
 
         let downloadedBundle;
         try {
           downloadedBundle = await CapacitorUpdater.download({
-            url: downloadUrl,
+            url: directAssetUrl,
             version: latestVersion,
           });
           console.log('[LiveUpdate] Download complete:', JSON.stringify(downloadedBundle));
         } catch (downloadErr: any) {
-          const msg = `Download failed: ${downloadErr?.message || String(downloadErr)}`;
-          console.error('[LiveUpdate]', msg);
-          alert(`[Tabby Update Debug]\n${msg}\n\nURL: ${downloadUrl}`);
-          setError(msg);
-          setIsDownloading(false);
-          return;
+          // If direct URL failed and was different from initial URL, try fallback
+          if (directAssetUrl !== downloadUrl) {
+            console.warn('[LiveUpdate] Direct URL download failed, trying original URL fallback...');
+            try {
+              downloadedBundle = await CapacitorUpdater.download({
+                url: downloadUrl,
+                version: latestVersion,
+              });
+            } catch (fallbackErr: any) {
+              const msg = `Download failed: ${fallbackErr?.message || String(fallbackErr)}`;
+              console.error('[LiveUpdate]', msg);
+              alert(`[Tabby Update Debug]\n${msg}\n\nURL: ${directAssetUrl}`);
+              setError(msg);
+              setIsDownloading(false);
+              return;
+            }
+          } else {
+            const msg = `Download failed: ${downloadErr?.message || String(downloadErr)}`;
+            console.error('[LiveUpdate]', msg);
+            alert(`[Tabby Update Debug]\n${msg}\n\nURL: ${directAssetUrl}`);
+            setError(msg);
+            setIsDownloading(false);
+            return;
+          }
         }
 
         setDownloadProgress(85);
