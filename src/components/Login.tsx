@@ -180,24 +180,47 @@ export default function Login({ onLogin }: LoginProps) {
     return { score: 4, text: 'Strong', color: 'bg-emerald-500' };
   };
 
-  // Instant 1-Tap Google Sign In
+  // Google Sign-In via Google Identity Services (GIS) One Tap
   const handleGoogleSignIn = async () => {
     setErrorMsg('');
     setIsLoading(true);
 
     try {
-      // 1-Tap In-App Google Sign-In (instant zero-friction authentication)
-      const user = await signInWithGoogle({
-        email: 'alex.split@gmail.com',
-        name: 'Alex Morgan',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
-        googleId: 'user-alex',
-      });
-      onLogin(user);
+      // Check if Google Identity Services SDK is loaded and initialized
+      if (typeof window !== 'undefined' && window.google?.accounts?.id) {
+        // Trigger the Google One Tap / account chooser prompt
+        window.google.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed()) {
+            const reason = notification.getNotDisplayedReason();
+            console.warn('Google One Tap not displayed:', reason);
+            // If One Tap can't display (e.g. cooldown, suppressed), show a helpful message
+            if (reason === 'opt_out_or_no_session') {
+              setErrorMsg('No active Google session found. Please sign in to your Google account in the browser first, then try again.');
+            } else if (reason === 'suppressed_by_user') {
+              setErrorMsg('Google sign-in was previously dismissed. Please try again in a few minutes or use email/password login.');
+            } else {
+              setErrorMsg('Google sign-in is temporarily unavailable. Please use email/password login.');
+            }
+            setIsLoading(false);
+          } else if (notification.isSkippedMoment()) {
+            console.warn('Google One Tap skipped:', notification.getSkippedReason());
+            setErrorMsg('Google sign-in was cancelled. Please try again.');
+            setIsLoading(false);
+          }
+          // If displayed successfully, the GIS callback (in useEffect above) will handle login
+        });
+      } else if (Capacitor.isNativePlatform()) {
+        // On native Android/iOS, GIS web SDK is not available
+        setErrorMsg('Google Sign-In is not yet available on the mobile app. Please use email/password login or sign in via the web version.');
+        setIsLoading(false);
+      } else {
+        // GIS script hasn't loaded yet
+        setErrorMsg('Google sign-in is still loading. Please wait a moment and try again.');
+        setIsLoading(false);
+      }
     } catch (err: any) {
-      console.error('Instant Google sign in error:', err);
-      setErrorMsg(err.message || 'Failed to sign in with Google.');
-    } finally {
+      console.error('Google sign-in error:', err);
+      setErrorMsg(err.message || 'Failed to sign in with Google. Please try email/password login.');
       setIsLoading(false);
     }
   };

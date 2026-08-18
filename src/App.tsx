@@ -68,6 +68,7 @@ export default function App() {
     isDownloading: isLiveDownloading,
     downloadProgress: liveDownloadProgress,
     latestVersion: liveLatestVersion,
+    releaseNotes: liveReleaseNotes,
     error: liveUpdateError,
     showBanner: showLiveBanner,
     applyUpdate: applyLiveUpdate,
@@ -198,7 +199,7 @@ export default function App() {
                 <span className="text-[11px] text-white/80 truncate">
                   {isLiveDownloading
                     ? 'Applying bundle & restarting...'
-                    : (liveUpdateError || 'Tap to update and load latest features')}
+                    : (liveUpdateError || liveReleaseNotes || 'Tap to update and load latest features')}
                 </span>
               </div>
             </div>
@@ -271,7 +272,7 @@ export default function App() {
               <span className="text-[11px] text-white/80 truncate">
                 {isLiveDownloading
                   ? 'Applying bundle & restarting...'
-                  : (liveUpdateError || 'Tap to update and load latest features')}
+                  : (liveUpdateError || liveReleaseNotes || 'Tap to update and load latest features')}
               </span>
             </div>
           </div>

@@ -56,9 +56,13 @@ jobs:
           name: v1.0.${{ github.run_number }} - ${{ steps.commit_info.outputs.title }}
           body: |
             ### 🚀 What's New in this Update:
-            - **Change**: ${{ steps.commit_info.outputs.title }}
+            ${{ steps.commit_info.outputs.title }}
+
+            ---
+            - **Version**: `v1.0.${{ github.run_number }}`
             - **Commit**: `${{ github.sha }}`
-            - **Build**: `${{ github.run_number }}`
+            - **Build**: #${{ github.run_number }}
+            - **Date**: ${{ github.event.head_commit.timestamp }}
           draft: false
           prerelease: false
           files: dist.zip
