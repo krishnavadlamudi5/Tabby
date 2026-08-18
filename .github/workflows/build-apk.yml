@@ -26,6 +26,9 @@ jobs:
 
       - name: Build Web Application
         run: npm run build
+        env:
+          VITE_API_URL: https://tabby-6i0f.onrender.com/api
+          VITE_GOOGLE_CLIENT_ID: 888676247797-cn7buordb6vqmd7qm6a35u8n6smievcr.apps.googleusercontent.com
 
       - name: Setup Java JDK 21
         uses: actions/setup-java@v4
