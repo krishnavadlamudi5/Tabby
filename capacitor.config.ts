@@ -28,17 +28,6 @@ const config: CapacitorConfig = {
       resize: 'body',
       style: 'DARK'
     },
-    SocialLogin: {
-      // Only Google is used; leaving the others enabled would bundle their
-      // native SDKs into the APK for no reason.
-      providers: {
-        google: true,
-        facebook: false,
-        apple: false,
-        twitter: false
-      },
-      logLevel: 1
-    },
     CapacitorUpdater: {
       autoUpdate: false,
       statsUrl: ''

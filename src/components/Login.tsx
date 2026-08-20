@@ -9,13 +9,14 @@ import { User } from '../types';
 import { DEMO_USERS } from '../data/demoData';
 import {
   signInWithGoogle,
+  startMobileGoogleSession,
+  pollMobileGoogleSession,
   signInWithEmail,
   registerWithEmail,
   sendOtpApi,
   resetPasswordApi,
   demoLoginApi
 } from '../lib/api';
-import { SocialLogin } from '@capgo/capacitor-social-login';
 import { 
   Sparkles, 
   ArrowRight, 
@@ -82,10 +83,23 @@ export default function Login({ onLogin }: LoginProps) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [resendCooldown, setResendCooldown] = useState<number>(0);
 
-  // Native Google Sign-In is initialized once, lazily, on first use.
-  const socialLoginReady = React.useRef(false);
+  // Mobile OAuth handoff session state
+  const [mobileAuthSession, setMobileAuthSession] = useState<{
+    sessionId: string;
+    loginUrl: string;
+  } | null>(null);
+  const pollingTimerRef = React.useRef<any>(null);
 
   const fullPhone = `${countryCode}${phoneNumber.trim()}`;
+
+  // Clean up polling timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingTimerRef.current) {
+        clearInterval(pollingTimerRef.current);
+      }
+    };
+  }, []);
 
   // Cooldown countdown timer
   useEffect(() => {
@@ -111,8 +125,10 @@ export default function Login({ onLogin }: LoginProps) {
     }
   };
 
-  // Initialize Google Identity Services (GIS)
+  // Initialize Google Identity Services (GIS) on Web
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) return;
+
     const initGis = () => {
       if (typeof window !== 'undefined' && window.google?.accounts?.id) {
         try {
@@ -138,9 +154,6 @@ export default function Login({ onLogin }: LoginProps) {
             },
             auto_select: false,
             cancel_on_tap_outside: true,
-            // FedCM is the only supported One Tap path now that browsers
-            // restrict third-party cookies. Declaring it keeps behaviour
-            // consistent instead of depending on the SDK default.
             use_fedcm_for_prompt: true,
           });
         } catch (err) {
@@ -151,13 +164,11 @@ export default function Login({ onLogin }: LoginProps) {
 
     initGis();
 
-    // Script load listener
     const scriptTag = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
     if (scriptTag) {
       scriptTag.addEventListener('load', initGis);
     }
 
-    // Interval check in case script finished asynchronously
     const timer = setInterval(() => {
       if (window.google?.accounts?.id) {
         initGis();
@@ -170,6 +181,103 @@ export default function Login({ onLogin }: LoginProps) {
       if (scriptTag) scriptTag.removeEventListener('load', initGis);
     };
   }, [onLogin]);
+
+  // Cancel in-progress mobile session
+  const cancelMobileGoogleSignIn = () => {
+    if (pollingTimerRef.current) {
+      clearInterval(pollingTimerRef.current);
+      pollingTimerRef.current = null;
+    }
+    setMobileAuthSession(null);
+    setIsLoading(false);
+  };
+
+  // Mobile App Google Sign-In via System Browser OAuth handoff
+  const startMobileGoogleSignIn = async () => {
+    setErrorMsg('');
+    setIsLoading(true);
+    if (pollingTimerRef.current) {
+      clearInterval(pollingTimerRef.current);
+      pollingTimerRef.current = null;
+    }
+
+    try {
+      const session = await startMobileGoogleSession();
+      setMobileAuthSession(session);
+
+      // Open in default external system browser (Chrome/Safari)
+      window.open(session.loginUrl, '_system');
+
+      // Poll for backend completion
+      let attempts = 0;
+      const maxAttempts = 120; // 3 minutes timeout
+
+      pollingTimerRef.current = setInterval(async () => {
+        attempts++;
+        try {
+          const res = await pollMobileGoogleSession(session.sessionId);
+          if (res.status === 'complete' && res.user && res.token) {
+            if (pollingTimerRef.current) {
+              clearInterval(pollingTimerRef.current);
+              pollingTimerRef.current = null;
+            }
+            setMobileAuthSession(null);
+            setIsLoading(false);
+            onLogin(res.user, res.token);
+          } else if (res.status === 'expired' || attempts >= maxAttempts) {
+            if (pollingTimerRef.current) {
+              clearInterval(pollingTimerRef.current);
+              pollingTimerRef.current = null;
+            }
+            setMobileAuthSession(null);
+            setIsLoading(false);
+            setErrorMsg('Google sign-in session expired. Please try again.');
+          }
+        } catch (pollErr: any) {
+          console.warn('Mobile session poll notice:', pollErr);
+        }
+      }, 1500);
+    } catch (err: any) {
+      console.error('Failed to start mobile Google sign-in:', err);
+      setErrorMsg(err.message || 'Could not start Google sign-in. Please try again.');
+      setIsLoading(false);
+      setMobileAuthSession(null);
+    }
+  };
+
+  // Universal Google Sign-In Trigger
+  const handleGoogleSignIn = async () => {
+    setErrorMsg('');
+
+    if (Capacitor.isNativePlatform()) {
+      await startMobileGoogleSignIn();
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      if (typeof window !== 'undefined' && window.google?.accounts?.id) {
+        window.google.accounts.id.prompt((notification: any) => {
+          try {
+            if (typeof notification?.getMomentType === 'function') {
+              console.info('Google One Tap moment:', notification.getMomentType());
+            }
+          } catch {
+            // SDK variations
+          }
+        });
+        setIsLoading(false);
+      } else {
+        // Fallback to web handoff if GIS script is not loaded
+        await startMobileGoogleSignIn();
+      }
+    } catch (err: any) {
+      console.error('Google sign-in error:', err);
+      setErrorMsg(err.message || 'Failed to sign in with Google. Please try email/password login.');
+      setIsLoading(false);
+    }
+  };
 
   // Password strength calculation
   const getPasswordStrength = (pass: string) => {
@@ -184,92 +292,6 @@ export default function Login({ onLogin }: LoginProps) {
     if (score <= 2) return { score: 2, text: 'Fair', color: 'bg-amber-400' };
     if (score <= 3) return { score: 3, text: 'Good', color: 'bg-blue-400' };
     return { score: 4, text: 'Strong', color: 'bg-emerald-500' };
-  };
-
-  /**
-   * Native (Capacitor) Google Sign-In.
-   *
-   * Uses Android Credential Manager via @capgo/capacitor-social-login, so the
-   * account picker is a native sheet inside the app - no system browser, no
-   * handoff page, no polling. `webClientId` is the Web OAuth client, which
-   * makes the returned ID token's `aud` match what the backend verifies.
-   */
-  const startNativeGoogleSignIn = async () => {
-    setErrorMsg('');
-    setIsLoading(true);
-
-    try {
-      if (!socialLoginReady.current) {
-        await SocialLogin.initialize({ google: { webClientId: GOOGLE_CLIENT_ID } });
-        socialLoginReady.current = true;
-      }
-
-      const { result } = await SocialLogin.login({
-        provider: 'google',
-        options: { scopes: ['email', 'profile'] }
-      });
-
-      const idToken = (result as any)?.idToken;
-      if (!idToken) {
-        setErrorMsg('Google did not return a sign-in token. Please try again.');
-        return;
-      }
-
-      const { user, token } = await signInWithGoogle(idToken);
-      onLogin(user, token);
-    } catch (err: any) {
-      const message = String(err?.message || err || '');
-      // Dismissing the native account sheet is a normal action, not a failure.
-      if (/cancel|dismiss|12501/i.test(message)) return;
-      console.error('Native Google sign-in failed:', err);
-      setErrorMsg(message || 'Google sign-in failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Google Sign-In via Google Identity Services (GIS) One Tap
-  const handleGoogleSignIn = async () => {
-    setErrorMsg('');
-
-    if (Capacitor.isNativePlatform()) {
-      await startNativeGoogleSignIn();
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      // Check if Google Identity Services SDK is loaded and initialized
-      if (typeof window !== 'undefined' && window.google?.accounts?.id) {
-        // Under FedCM, isNotDisplayed()/getNotDisplayedReason()/isSkippedMoment()
-        // were removed and throw if called, which previously swallowed every
-        // sign-in into the generic catch below. The credential callback in the
-        // effect above is now the only success path; the moment callback is
-        // used purely for best-effort diagnostics.
-        window.google.accounts.id.prompt((notification: any) => {
-          try {
-            if (typeof notification?.getMomentType === 'function') {
-              console.info('Google One Tap moment:', notification.getMomentType());
-            }
-          } catch {
-            // Older/newer SDK shapes differ - diagnostics must never break sign-in.
-          }
-        });
-
-        // The prompt either resolves through the credential callback or the
-        // user dismisses it; nothing further to await here.
-        setIsLoading(false);
-      } else {
-        // GIS script hasn't loaded yet
-        setErrorMsg('Google sign-in is still loading. Please wait a moment and try again.');
-        setIsLoading(false);
-      }
-    } catch (err: any) {
-      console.error('Google sign-in error:', err);
-      setErrorMsg(err.message || 'Failed to sign in with Google. Please try email/password login.');
-      setIsLoading(false);
-    }
   };
 
   // 1. Direct Password Sign In (Email or Mobile + Password)
@@ -480,6 +502,35 @@ export default function Login({ onLogin }: LoginProps) {
                 </>
               )}
             </button>
+
+            {/* In-progress Mobile Browser Handoff Notice */}
+            {mobileAuthSession && (
+              <div className="p-3.5 bg-[#EBF1ED] border border-[#3C5A48]/30 rounded-2xl flex flex-col gap-2 animate-fadeIn" id="mobile-auth-notice">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#3C5A48]">
+                    <div className="w-3.5 h-3.5 border-2 border-[#3C5A48] border-t-transparent rounded-full animate-spin"></div>
+                    <span>Waiting for Google Sign-In...</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={cancelMobileGoogleSignIn}
+                    className="text-[11px] font-bold text-[#736F6A] hover:text-red-500 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <p className="text-[11px] text-[#555] leading-relaxed">
+                  Complete sign-in in your browser window. You'll be logged in automatically here.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.open(mobileAuthSession.loginUrl, '_system')}
+                  className="w-full py-1.5 px-3 bg-[#3C5A48] text-white text-xs font-bold rounded-xl shadow-2xs hover:bg-[#2F4739] cursor-pointer transition-colors"
+                >
+                  Open Browser Again
+                </button>
+              </div>
+            )}
 
             {/* Divider */}
             <div className="relative flex py-1 items-center" id="auth-divider">
