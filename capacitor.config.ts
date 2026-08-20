@@ -28,6 +28,15 @@ const config: CapacitorConfig = {
       resize: 'body',
       style: 'DARK'
     },
+    SocialLogin: {
+      providers: {
+        google: true,
+        facebook: false,
+        apple: false,
+        twitter: false
+      },
+      logLevel: 1
+    },
     CapacitorUpdater: {
       autoUpdate: false,
       statsUrl: ''

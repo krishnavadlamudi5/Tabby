@@ -17,6 +17,7 @@ import {
   resetPasswordApi,
   demoLoginApi
 } from '../lib/api';
+import { SocialLogin } from '@capgo/capacitor-social-login';
 import { 
   Sparkles, 
   ArrowRight, 
@@ -245,12 +246,63 @@ export default function Login({ onLogin }: LoginProps) {
     }
   };
 
+  const socialLoginInitializedRef = React.useRef(false);
+
+  // Native Android Google 1-Tap Bottom Sheet Popup
+  const startNativeGoogleSignIn = async () => {
+    setErrorMsg('');
+    setIsLoading(true);
+
+    try {
+      if (!socialLoginInitializedRef.current) {
+        await SocialLogin.initialize({
+          google: { webClientId: GOOGLE_CLIENT_ID }
+        });
+        socialLoginInitializedRef.current = true;
+      }
+
+      const response = await SocialLogin.login({
+        provider: 'google',
+        options: { scopes: ['email', 'profile'] }
+      });
+
+      const idToken = (response?.result as any)?.idToken;
+      if (idToken) {
+        const { user, token } = await signInWithGoogle(idToken);
+        onLogin(user, token);
+        return;
+      }
+
+      throw new Error('Google did not return an identity token.');
+    } catch (err: any) {
+      const message = String(err?.message || err || '');
+
+      // User cancelled / dismissed the native bottom sheet dialog
+      if (/cancel|dismiss|12501|16|USER_CANCELLED/i.test(message)) {
+        setIsLoading(false);
+        return;
+      }
+
+      // If native plugin is not yet compiled into older APK, gracefully fallback
+      if (/not implemented|unimplemented|unavailable/i.test(message)) {
+        console.warn('Native Google login plugin not present in installed APK, falling back to browser flow...');
+        await startMobileGoogleSignIn();
+        return;
+      }
+
+      console.error('Native Google sign-in error:', err);
+      setErrorMsg(message || 'Failed to sign in with Google.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Universal Google Sign-In Trigger
   const handleGoogleSignIn = async () => {
     setErrorMsg('');
 
     if (Capacitor.isNativePlatform()) {
-      await startMobileGoogleSignIn();
+      await startNativeGoogleSignIn();
       return;
     }
 
