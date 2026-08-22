@@ -12,17 +12,6 @@ const router = Router();
 
 // ---------------------------------------------------------------------------
 // Rate limiting
-//
-// Previously every /api/auth/* route (most importantly send-otp and
-// verify-otp) had no throttling at all: a code is only 6 digits (1e6
-// possibilities) and was valid for 10 minutes with unlimited guesses, and
-// send-otp could be hit with an arbitrary destination with no limit -
-// letting anyone email/SMS-bomb a victim for free. Two layers here:
-//  1. IP-based rate limits (below) blunt both brute force and bombing from
-//     any single source.
-//  2. A per-destination attempt cap on the OTP entry itself (see
-//     verify-otp/register) blunts distributed brute force that spreads
-//     requests across many IPs against one target.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 60, // generous ceiling for the whole auth surface
@@ -359,12 +348,7 @@ router.post('/register', verifyOtpLimiter, async (req: Request, res: Response): 
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    // OTP is mandatory, not optional - previously this whole block only ran
-    // `if (otp)`, and even then only rejected on a *mismatch*: if no entry
-    // existed at all (send-otp was never called, or it had already expired),
-    // the check silently passed and the account was created with the email
-    // never actually verified. Now a missing/expired/mismatched code always
-    // rejects registration.
+    // OTP is mandatory
     if (!otp || !otp.trim()) {
       res.status(400).json({ error: 'A verification code is required. Please request one first.' });
       return;

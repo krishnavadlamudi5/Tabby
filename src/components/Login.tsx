@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { User } from '../types';
 import { DEMO_USERS } from '../data/demoData';
 import {
@@ -208,8 +209,12 @@ export default function Login({ onLogin }: LoginProps) {
       const session = await startMobileGoogleSession();
       setMobileAuthSession(session);
 
-      // Open in default external system browser (Chrome/Safari)
-      window.open(session.loginUrl, '_system');
+      // Open in default external system browser (Chrome/Safari) or In-App Browser
+      if (Capacitor.isNativePlatform()) {
+        await Browser.open({ url: session.loginUrl });
+      } else {
+        window.open(session.loginUrl, '_system');
+      }
 
       // Poll for backend completion
       let attempts = 0;
@@ -227,6 +232,9 @@ export default function Login({ onLogin }: LoginProps) {
               clearInterval(pollingTimerRef.current);
               pollingTimerRef.current = null;
             }
+            if (Capacitor.isNativePlatform()) {
+              Browser.close().catch(console.warn);
+            }
             setMobileAuthSession(null);
             setIsLoading(false);
             onLogin(res.user, res.token);
@@ -234,6 +242,9 @@ export default function Login({ onLogin }: LoginProps) {
             if (pollingTimerRef.current) {
               clearInterval(pollingTimerRef.current);
               pollingTimerRef.current = null;
+            }
+            if (Capacitor.isNativePlatform()) {
+              Browser.close().catch(console.warn);
             }
             setMobileAuthSession(null);
             setIsLoading(false);
