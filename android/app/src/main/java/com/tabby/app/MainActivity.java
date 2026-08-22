@@ -26,4 +26,9 @@ public class MainActivity extends BridgeActivity implements ModifiedMainActivity
             // Fallback gracefully
         }
     }
+
+    @Override
+    public void IHaveModifiedTheMainActivityForTheUseWithSocialLoginPlugin() {
+        // Required by the ModifiedMainActivityForSocialLoginPlugin interface
+    }
 }
