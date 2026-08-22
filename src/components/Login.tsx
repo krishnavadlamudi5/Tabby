@@ -70,8 +70,10 @@ export default function Login({ onLogin }: LoginProps) {
   const [countryCode, setCountryCode] = useState('+91');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [otpMethod, setOtpMethod] = useState<'sms' | 'email'>('sms');
 
   // OTP flow states
@@ -309,19 +311,44 @@ export default function Login({ onLogin }: LoginProps) {
     setIsLoading(true);
 
     try {
-      if (typeof window !== 'undefined' && window.google?.accounts?.id) {
-        window.google.accounts.id.prompt((notification: any) => {
-          try {
-            if (typeof notification?.getMomentType === 'function') {
-              console.info('Google One Tap moment:', notification.getMomentType());
+      if (typeof window !== 'undefined' && window.google?.accounts?.oauth2) {
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: GOOGLE_CLIENT_ID,
+          scope: 'email profile openid',
+          callback: async (response: any) => {
+            if (response?.error) {
+              console.warn('Google OAuth response:', response);
+              setIsLoading(false);
+              if (response.error !== 'access_denied') {
+                setErrorMsg(response.error_description || 'Google sign-in was not completed.');
+              }
+              return;
             }
-          } catch {
-            // SDK variations
+
+            if (response?.access_token) {
+              try {
+                const { user, token } = await signInWithGoogle({ accessToken: response.access_token });
+                onLogin(user, token);
+              } catch (backendErr: any) {
+                console.error('Google backend auth error:', backendErr);
+                setErrorMsg(backendErr.message || 'Failed to authenticate with Google account.');
+              } finally {
+                setIsLoading(false);
+              }
+            } else {
+              setIsLoading(false);
+            }
+          },
+          error_callback: (err: any) => {
+            console.error('Google token client error:', err);
+            setIsLoading(false);
+            setErrorMsg('Could not open Google sign-in popup. Please check popup blockers or try again.');
           }
         });
-        setIsLoading(false);
+
+        tokenClient.requestAccessToken({ prompt: 'select_account' });
       } else {
-        // Fallback to web handoff if GIS script is not loaded
+        // Fallback to web handoff if GIS script is not loaded or blocked
         await startMobileGoogleSignIn();
       }
     } catch (err: any) {
@@ -390,6 +417,10 @@ export default function Login({ onLogin }: LoginProps) {
     }
     if (!password || password.length < 6) {
       setErrorMsg('Password must be at least 6 characters long for secure account creation');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setErrorMsg('Passwords do not match. Please ensure both passwords are the same.');
       return;
     }
 
@@ -518,11 +549,11 @@ export default function Login({ onLogin }: LoginProps) {
         <div className="flex flex-col items-center text-center gap-1.5" id="brand-header">
           <AppLogo size="lg" showText={true} />
           <p className="text-xs text-[#736F6A] max-w-xs mt-1" id="brand-tagline">
-            Split bills, track shared expenses & settle up seamlessly with MongoDB.
+            Split bills, track shared expenses & settle up seamlessly.
           </p>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 mt-1.5 rounded-full bg-[#EBF1ED] border border-[#3C5A48]/30 text-[#3C5A48] text-[11px] font-extrabold shadow-2xs">
             <Sparkles className="w-3.5 h-3.5 text-[#3C5A48] animate-bounce" />
-            <span>Fast 1-Tap Google Sign-In & Live Sync</span>
+            <span>Simple, Fast & Secure</span>
           </div>
         </div>
 
@@ -823,6 +854,28 @@ export default function Login({ onLogin }: LoginProps) {
                   />
                 </div>
               )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-[#2C2B29]">Confirm Password</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="Re-enter your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="w-full px-3.5 py-2 pr-10 border border-[#E6E1DA] rounded-xl text-sm focus:outline-none focus:border-[#3C5A48] focus:ring-1 focus:ring-[#3C5A48] bg-[#FAF8F5]/40 text-[#2C2B29]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-2.5 text-[#736F6A] hover:text-[#2C2B29] cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center gap-2.5 p-3 bg-[#EBF1ED] border border-[#3C5A48]/20 rounded-xl text-xs text-[#3C5A48] font-medium">

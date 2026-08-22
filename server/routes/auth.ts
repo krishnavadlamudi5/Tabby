@@ -558,6 +558,31 @@ async function verifyGoogleIdToken(credential: string): Promise<GoogleProfile> {
   };
 }
 
+// Verifies a Google access token with Google userinfo API and returns the profile.
+async function verifyGoogleAccessToken(accessToken: string): Promise<GoogleProfile> {
+  const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  if (!resp.ok) {
+    throw new Error('Google token verification failed. Please try signing in again.');
+  }
+  const payload: any = await resp.json();
+
+  if (!payload.email) {
+    throw new Error('Google account did not provide an email address.');
+  }
+  if (payload.email_verified === false || payload.email_verified === 'false') {
+    throw new Error('This Google account does not have a verified email address.');
+  }
+
+  return {
+    email: payload.email,
+    name: payload.name,
+    avatar: payload.picture,
+    googleId: payload.sub
+  };
+}
+
 // Finds or creates the Tabby account behind a Google profile.
 async function upsertGoogleUser(profile: GoogleProfile) {
   const normalizedEmail = profile.email.toLowerCase().trim();
@@ -590,19 +615,23 @@ async function upsertGoogleUser(profile: GoogleProfile) {
 }
 
 // POST /api/auth/google (Google Authentication)
-// Requires { credential } - a Google ID token, verified server-side via
-// verifyGoogleIdToken(). A prior "legacy" fallback that trusted a raw
-// client-supplied { email } with no verification has been removed: it let
-// anyone log in as any existing account just by POSTing their email address.
+// Accepts either { credential } (Google ID token from One Tap / Native)
+// or { accessToken } (Google OAuth2 token from Popup chooser)
 router.post('/google', authLimiter, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { credential } = req.body;
-    if (!credential) {
-      res.status(400).json({ error: 'Google credential is required' });
+    const { credential, accessToken } = req.body;
+    if (!credential && !accessToken) {
+      res.status(400).json({ error: 'Google credential or accessToken is required' });
       return;
     }
 
-    const profile = await verifyGoogleIdToken(credential);
+    let profile: GoogleProfile;
+    if (credential) {
+      profile = await verifyGoogleIdToken(credential);
+    } else {
+      profile = await verifyGoogleAccessToken(accessToken);
+    }
+
     const userObj = await upsertGoogleUser(profile);
     const token = signToken(userObj.id);
     res.json({ success: true, user: userObj, token });

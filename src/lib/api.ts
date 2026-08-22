@@ -132,12 +132,17 @@ export async function demoLoginApi(userId: string): Promise<AuthResult> {
 }
 
 // signInWithGoogle expects a verified Google ID token (credential) obtained
-// from Google Identity Services. There is no more "offline/demo" fallback
-// that fabricates a user client-side - the backend is the source of truth.
-export async function signInWithGoogle(credential: string): Promise<AuthResult> {
+// from Google Identity Services or an access token from GIS OAuth2 popup.
+export async function signInWithGoogle(
+  credentialOrData: string | { credential?: string; accessToken?: string }
+): Promise<AuthResult> {
+  const payload = typeof credentialOrData === 'string'
+    ? { credential: credentialOrData }
+    : credentialOrData;
+
   const data = await request<{ success: boolean; user: User; token: string }>('/auth/google', {
     method: 'POST',
-    body: JSON.stringify({ credential }),
+    body: JSON.stringify(payload),
   });
   return { user: data.user, token: data.token };
 }
