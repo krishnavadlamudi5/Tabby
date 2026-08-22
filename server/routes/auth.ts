@@ -105,10 +105,10 @@ async function linkGhostUser(newUserId: string, email: string, phone?: string) {
   try {
     let ghostUser = null;
     if (email) {
-      ghostUser = await User.findOne({ email: email.toLowerCase().trim(), id: /^user-/ });
+      ghostUser = await User.findOne({ email: email.toLowerCase().trim(), authProvider: 'ghost' });
     }
     if (!ghostUser && phone) {
-      ghostUser = await User.findOne({ phone: phone.trim(), id: /^user-/ });
+      ghostUser = await User.findOne({ phone: phone.trim(), authProvider: 'ghost' });
     }
 
     if (!ghostUser || ghostUser.id === newUserId) return;
@@ -396,7 +396,7 @@ router.post('/register', verifyOtpLimiter, async (req: Request, res: Response): 
 
     const existingUser = await User.findOne({ email: normalizedEmail });
 
-    if (existingUser && !existingUser.id.startsWith('user-')) {
+    if (existingUser && existingUser.authProvider !== 'ghost') {
       res.status(400).json({ error: 'An account with this email address already exists. Please sign in instead.' });
       return;
     }

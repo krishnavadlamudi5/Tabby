@@ -214,8 +214,11 @@ export default function Login({ onLogin }: LoginProps) {
       // Poll for backend completion
       let attempts = 0;
       const maxAttempts = 120; // 3 minutes timeout
+      let isPolling = false;
 
       pollingTimerRef.current = setInterval(async () => {
+        if (isPolling) return;
+        isPolling = true;
         attempts++;
         try {
           const res = await pollMobileGoogleSession(session.sessionId);
@@ -238,6 +241,8 @@ export default function Login({ onLogin }: LoginProps) {
           }
         } catch (pollErr: any) {
           console.warn('Mobile session poll notice:', pollErr);
+        } finally {
+          isPolling = false;
         }
       }, 1500);
     } catch (err: any) {
