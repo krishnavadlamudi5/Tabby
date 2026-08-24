@@ -12,6 +12,7 @@ import {
 } from '../lib/api';
 import { formatAmount } from '../utils/currency';
 import { isDemoUser, getDemoInitialData, DEMO_USERS, DEMO_GROUPS, DEMO_EXPENSES, DEMO_ACTIVITIES } from '../data/demoData';
+import { useToastStore } from './useToastStore';
 
 interface AppState {
   currentUser: User | null;
@@ -219,6 +220,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     persistUserData(currentUser.id, { users, groups: updatedGroups, expenses, activities: updatedActs });
     set({ groups: updatedGroups, activities: updatedActs });
+    
+    useToastStore.getState().addToast(`Group "${newGroup.name}" created`, 'success');
+    
     return newGroup.id;
   },
 
@@ -256,6 +260,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Sync to DB
     addFriendInDb(name, email);
     saveActivityToDb(newAct);
+    
+    useToastStore.getState().addToast(`Added "${newFriend.name}" as friend`, 'success');
   },
 
   saveExpense: (expenseData) => {
@@ -283,6 +289,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         description: `updated "${updatedExpense.description}" (${formatAmount(updatedExpense.amount, currency)}) ${scopeText}`,
         timestamp: new Date().toISOString(),
       };
+      
+      useToastStore.getState().addToast('Expense updated successfully', 'success');
     } else {
       const newExpense: Expense = {
         ...(expenseData as Omit<Expense, 'id' | 'createdBy' | 'createdAt'>),
@@ -306,6 +314,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         description: `added "${newExpense.description}" (${formatAmount(newExpense.amount, currency)}) ${scopeText}`,
         timestamp: new Date().toISOString(),
       };
+      
+      useToastStore.getState().addToast('Expense added successfully', 'success');
     }
 
     saveActivityToDb(newAct);
@@ -338,6 +348,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     persistUserData(currentUser.id, { users, groups, expenses: updatedExpenses, activities: updatedActs });
 
     set({ expenses: updatedExpenses, activities: updatedActs });
+    
+    useToastStore.getState().addToast('Expense deleted', 'info');
   },
 
   settleDebt: (fromUserId, toUserId, amount, groupId) => {
@@ -379,6 +391,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     persistUserData(currentUser.id, { users, groups, expenses: updatedExpenses, activities: updatedActs });
 
     set({ expenses: updatedExpenses, activities: updatedActs });
+    
+    useToastStore.getState().addToast('Settlement recorded', 'success');
   },
 
   simulateAppUpdate: () => {
@@ -393,5 +407,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     saveActivityToDb(updateAct);
     const updatedActs = [updateAct, ...activities];
     set({ activities: updatedActs });
+    
+    useToastStore.getState().addToast('Simulated a new update!', 'activity');
   }
 }));
