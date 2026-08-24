@@ -87,7 +87,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   groups: [],
   expenses: [],
   activities: [],
-  currency: 'USD',
+  currency: 'INR',
 
   setCurrentUser: (user) => set({ currentUser: user }),
   setUsers: (users) => set({ users }),
@@ -188,7 +188,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       groups: [],
       expenses: [],
       activities: [],
-      currency: 'USD'
+      currency: 'INR'
     });
   },
 
