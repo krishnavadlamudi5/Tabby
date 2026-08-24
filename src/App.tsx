@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import Login from './components/Login';
+
 import DashboardView from './components/DashboardView';
 import GroupView from './components/GroupView';
 import FriendView from './components/FriendView';
@@ -32,7 +32,7 @@ export default function App() {
     activities,
     currency,
     initStore,
-    login,
+
     syncWithBackend,
     setCurrentUser,
     setUsers,
@@ -176,74 +176,9 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <>
-        {(showLiveBanner || (isAppUpdateAvailable && showAppUpdateBanner)) && (
-          <div 
-            className="bg-[#3C5A48] text-white px-4 pb-3 flex items-center justify-between text-xs font-semibold shadow-md border-b border-[#2E4738] z-50 animate-fadeIn sticky top-0"
-            style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 36px)' }}
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-1.5 rounded-lg bg-white/15 text-[#D9A05B] shrink-0">
-                {isLiveDownloading ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                ) : (
-                  <Sparkles className="w-4 h-4 text-emerald-300" />
-                )}
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="font-bold text-white text-xs truncate">
-                  {isLiveDownloading
-                    ? `Downloading Update... (${liveDownloadProgress}%)`
-                    : (liveUpdateError ? 'Update Failed' : `Update ${liveLatestVersion || ''} Available!`)}
-                </span>
-                <span className="text-[11px] text-white/80 truncate">
-                  {isLiveDownloading
-                    ? 'Applying bundle & restarting...'
-                    : (liveUpdateError || liveReleaseNotes || 'Tap to update and load latest features')}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0 ml-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (isLiveUpdateAvailable) {
-                    applyLiveUpdate();
-                  } else {
-                    window.location.reload();
-                  }
-                }}
-                disabled={isLiveDownloading}
-                className="px-3.5 py-1.5 bg-white hover:bg-[#EBF1ED] active:scale-95 disabled:opacity-50 text-[#3C5A48] font-extrabold text-xs rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
-              >
-                {isLiveDownloading ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Updating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-3.5 h-3.5" />
-                    <span>{liveUpdateError ? 'Retry' : 'Update Now'}</span>
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  dismissLiveUpdate();
-                  setShowAppUpdateBanner(false);
-                }}
-                className="p-1.5 text-white/80 hover:text-white transition-colors cursor-pointer rounded-lg hover:bg-white/10"
-                aria-label="Dismiss"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-        <Login onLogin={login} />
-      </>
+      <div className="min-h-screen bg-[#F8F5F2] flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 animate-spin text-[#3C5A48]" />
+      </div>
     );
   }
 

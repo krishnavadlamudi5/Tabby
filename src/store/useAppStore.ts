@@ -8,11 +8,7 @@ import {
   saveActivityToDb,
   updateUserProfileInDb,
   addFriendInDb,
-  signOutUser,
-  syncUserData,
-  setAuthToken,
-  getAuthToken,
-  onUnauthorized
+  syncUserData
 } from '../lib/api';
 import { formatAmount } from '../utils/currency';
 import { isDemoUser, getDemoInitialData, DEMO_USERS, DEMO_GROUPS, DEMO_EXPENSES, DEMO_ACTIVITIES } from '../data/demoData';
@@ -35,8 +31,7 @@ interface AppState {
   
   initStore: () => void;
   syncWithBackend: (userId: string) => Promise<void>;
-  login: (user: User, token: string) => void;
-  logout: () => void;
+
   updateProfile: (updatedFields: Partial<User>) => void;
   resetData: () => void;
   
@@ -105,35 +100,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   initStore: () => {
-    // Any 401 from the backend (expired/invalid token) drops the app back to
-    // the login screen instead of spinning on failed requests forever.
-    onUnauthorized(() => get().logout());
-
     try {
       const savedCurrency = localStorage.getItem('splitwise_currency');
       if (savedCurrency) set({ currency: savedCurrency });
 
-      const rawUser = localStorage.getItem('splitwise_user');
-      const token = getAuthToken();
-
-      // A cached user with no token means this is a session from before
-      // authenticated sync existed (or a corrupted/cleared token) - it can't
-      // be restored, so require a fresh sign-in rather than showing stale
-      // local data the backend will now reject.
-      if (rawUser && token) {
-        const user = JSON.parse(rawUser) as User;
-        const initial = loadUserData(user);
-        set({
-          currentUser: user,
-          users: initial.users,
-          groups: initial.groups,
-          expenses: initial.expenses,
-          activities: initial.activities,
-        });
-        get().syncWithBackend(user.id);
-      } else if (rawUser && !token) {
-        localStorage.removeItem('splitwise_user');
-      }
+      const defaultUser = getDemoInitialData('user-alex');
+      set({
+        currentUser: defaultUser.currentUser,
+        users: defaultUser.users,
+        groups: defaultUser.groups,
+        expenses: defaultUser.expenses,
+        activities: defaultUser.activities,
+      });
+      get().syncWithBackend('user-alex');
     } catch (e) {
       console.error('Failed to initialize store:', e);
     }
@@ -181,46 +160,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  login: (user, token) => {
-    const isDemo = isDemoUser(user.id);
-    let initialData: { users: User[]; groups: Group[]; expenses: Expense[]; activities: Activity[] };
 
-    if (isDemo) {
-      initialData = getDemoInitialData(user.id);
-    } else {
-      initialData = loadUserData(user);
-    }
-
-    setAuthToken(token);
-    localStorage.setItem('splitwise_user', JSON.stringify(user));
-    persistUserData(user.id, initialData);
-
-    set({
-      currentUser: user,
-      users: initialData.users,
-      groups: initialData.groups,
-      expenses: initialData.expenses,
-      activities: initialData.activities,
-    });
-
-    // The auth endpoint that produced `user` (login/register/google/demo)
-    // already persisted the authoritative record server-side - no separate
-    // "save user" call is needed (or safe: that call used to be an
-    // unauthenticated mass-assignment upsert, now removed).
-    get().syncWithBackend(user.id);
-  },
-
-  logout: () => {
-    signOutUser();
-    localStorage.removeItem('splitwise_user');
-    set({
-      currentUser: null,
-      users: [],
-      groups: [],
-      expenses: [],
-      activities: [],
-    });
-  },
 
   updateProfile: (updatedFields) => {
     const { currentUser, users, groups, expenses, activities } = get();
