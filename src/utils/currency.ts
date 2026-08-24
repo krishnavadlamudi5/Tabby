@@ -25,13 +25,13 @@ export const SUPPORTED_CURRENCIES: CurrencyConfig[] = [
   { code: 'MXN', symbol: 'MX$', name: 'Mexican Peso (MX$)', locale: 'es-MX' },
 ];
 
-export const DEFAULT_CURRENCY = 'USD';
+export const DEFAULT_CURRENCY = 'INR';
 
 export function getCurrencyConfig(code: string): CurrencyConfig {
   return SUPPORTED_CURRENCIES.find((c) => c.code === code) || SUPPORTED_CURRENCIES[0];
 }
 
-export function formatAmount(amount: number, currencyCode: string = 'USD', showSign: boolean = false): string {
+export function formatAmount(amount: number, currencyCode: string = 'INR', showSign: boolean = false): string {
   const config = getCurrencyConfig(currencyCode);
   const absoluteAmount = Math.abs(amount);
 
