@@ -20,6 +20,11 @@ export interface Group {
   category: GroupCategory;
   members: string[]; // List of user IDs
   createdAt: string;
+  // Trip extras (only for category 'trip'); set from Money's trip panel.
+  startDate?: string | null;
+  endDate?: string | null;
+  budgetPaise?: number | null;
+  currency?: string;
 }
 
 export type SplitMethod = 'equally' | 'exactly' | 'percentage';

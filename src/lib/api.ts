@@ -39,17 +39,16 @@ export function onUnauthorized(handler: (() => void) | null): void {
   unauthorizedHandler = handler;
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function send(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const token = getAuthToken();
+  const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isForm ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...((options.headers as Record<string, string>) || {}),
   };
-
-  let res: Response;
   try {
-    res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+    return await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
   } catch {
     // fetch() rejects with a bare TypeError for anything that stops the
     // request at the network layer: offline, DNS, a CORS rejection, or a
@@ -59,6 +58,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       0
     );
   }
+}
+
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = getAuthToken();
+  const res = await send(endpoint, options);
 
   // A proxy/gateway error can return HTML rather than JSON.
   let data: any;
@@ -72,9 +76,39 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     if (res.status === 401 && token && unauthorizedHandler) {
       unauthorizedHandler();
     }
-    throw new ApiError(data.error || `Request failed (HTTP ${res.status})`, res.status);
+    const err = new ApiError(data.error || `Request failed (HTTP ${res.status})`, res.status);
+    (err as any).details = data.details;
+    (err as any).code = data.code;
+    throw err;
   }
   return data as T;
+}
+
+/** Authenticated JSON request for feature modules (e.g. src/features/finance). */
+export function apiRequest<T = any>(endpoint: string, options: { method?: string; body?: unknown } = {}): Promise<T> {
+  const body = options.body === undefined
+    ? undefined
+    : typeof FormData !== 'undefined' && options.body instanceof FormData
+      ? options.body
+      : JSON.stringify(options.body);
+  return request<T>(endpoint, { method: options.method || (body ? 'POST' : 'GET'), body: body as BodyInit | undefined });
+}
+
+/** Authenticated binary download (documents). */
+export async function apiDownload(endpoint: string): Promise<Blob> {
+  const token = getAuthToken();
+  const res = await send(endpoint);
+  if (!res.ok) {
+    if (res.status === 401 && token && unauthorizedHandler) unauthorizedHandler();
+    let msg = `Download failed (HTTP ${res.status})`;
+    try {
+      msg = (await res.json()).error || msg;
+    } catch {
+      // not JSON
+    }
+    throw new ApiError(msg, res.status);
+  }
+  return res.blob();
 }
 
 // --- Auth --------------------------------------------------------------

@@ -142,6 +142,15 @@ describe('ledger scenarios', () => {
     expect(list.body.transactions.some((t: any) => t.status === 'declined')).toBe(false);
   });
 
+  it('S1 out of order (newest-first backfill): reversal before the debit still links', async () => {
+    await ingest(fixture('F03'));
+    await ingest(fixture('X01'));
+    const debit = await Transaction.findOne({ ownerId: OWNER, direction: 'debit' });
+    const credit = await Transaction.findOne({ ownerId: OWNER, direction: 'credit' });
+    expect(String(debit!.linkedTransactionId)).toBe(String(credit!._id));
+    expect(await spendNovember()).toBe(0);
+  });
+
   it('S2 Meesho ₹138: Kotak alert + Razorpay receipt -> exactly one transaction', async () => {
     await ingest(fixture('X02'));
     await ingest(fixture('F08'));

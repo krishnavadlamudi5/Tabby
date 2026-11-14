@@ -12,7 +12,7 @@ import { normaliseBody } from './text';
 import { Extraction } from './types';
 import { resolveAccount } from '../ledger/accounts';
 import { findDuplicate, richerMerchant } from '../ledger/dedupe';
-import { findOriginalDebit, findPendingRefund, linkPair } from '../ledger/linkRefunds';
+import { findEarlierRefund, findOriginalDebit, findPendingRefund, linkPair } from '../ledger/linkRefunds';
 import { isCreditCardBillPayment, isSelfTransfer } from '../ledger/classify';
 import { categorize } from '../ledger/categorize';
 import { displayMerchant, normaliseMerchant } from '../ledger/merchants';
@@ -175,10 +175,24 @@ function serialise(ext: Extraction): Record<string, any> {
 
 // ---------------------------------------------------------------- money events
 
+/**
+ * Many alerts give a date without a time ("on Nov 12, 2026"), which parses
+ * to midnight. If the email arrived that same India day, its arrival time is
+ * a better timestamp (and keeps dedupe's 15-minute window meaningful).
+ */
+export function effectiveTime(occurredAt: Date | undefined, receivedAt: Date): Date {
+  if (!occurredAt) return receivedAt;
+  const p = istParts(occurredAt);
+  const isMidnight = p.hour === 0 && p.minute === 0 && occurredAt.getUTCSeconds() === 0;
+  const r = istParts(receivedAt);
+  if (isMidnight && p.year === r.year && p.month0 === r.month0 && p.day === r.day) return receivedAt;
+  return occurredAt;
+}
+
 async function applyMoneyEvent(ownerId: string, raw: IRawEvent, ext: Extraction, sender: string): Promise<{ txnIds: string[]; status: IRawEvent['status']; reason?: string }> {
   const { account, unknown, hint } = await resolveAccount(ownerId, ext);
   const accountId = account ? String(account._id) : null;
-  const postedAt = ext.occurredAt || raw.receivedAt;
+  const postedAt = effectiveTime(ext.occurredAt, raw.receivedAt);
   const amountPaise = ext.amountPaise!;
   const direction = ext.direction || 'debit';
 
@@ -273,6 +287,10 @@ async function applyMoneyEvent(ownerId: string, raw: IRawEvent, ext: Extraction,
     if (isSelfTransfer({ channel: ext.channel, counterparty: ext.counterparty, ownerName: owner?.name || '', accounts, accountId })) kind = 'self_transfer';
     else if (isCreditCardBillPayment({ direction, merchant: ext.merchant, counterpartyAccount: ext.counterparty?.account, account, accounts })) kind = 'cc_bill_payment';
     txn = await Transaction.create({ ...base, kind });
+    if (kind === 'expense') {
+      const refund = await findEarlierRefund(txn);
+      if (refund) await linkPair(refund, txn);
+    }
     if (kind === 'expense' && amountPaise >= largeDebitThresholdPaise()) {
       await raiseAlert(ownerId, {
         type: 'large_debit', title: `Large payment: ${formatPaiseINR(amountPaise)}${txn.merchant ? ` to ${txn.merchant}` : ''}`,

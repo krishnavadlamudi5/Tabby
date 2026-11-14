@@ -62,3 +62,24 @@ export async function linkPair(refund: ITransaction, original: ITransaction): Pr
   await Transaction.updateOne({ _id: refund._id }, { $set: { linkedTransactionId: original._id, kind: 'refund' } });
   await Transaction.updateOne({ _id: original._id }, { $set: { linkedTransactionId: refund._id } });
 }
+
+/**
+ * The other direction: a debit arrives after its refund/reversal was already
+ * recorded (Gmail backfill runs newest-first). Finds an unlinked refund that
+ * shares a reference id, or is on the same account for the same amount within
+ * 60 days after the debit.
+ */
+export async function findEarlierRefund(debit: ITransaction): Promise<ITransaction | null> {
+  const base = { ownerId: debit.ownerId, direction: 'credit' as const, kind: 'refund' as const, status: 'settled' as const, linkedTransactionId: null };
+  if (debit.referenceIds.length) {
+    const byRef = await Transaction.findOne({ ...base, referenceIds: { $in: debit.referenceIds } });
+    if (byRef) return byRef;
+  }
+  if (!debit.accountId) return null;
+  return Transaction.findOne({
+    ...base,
+    accountId: debit.accountId,
+    amountPaise: debit.amountPaise,
+    postedAt: { $gte: debit.postedAt, $lte: addDays(debit.postedAt, 60) },
+  }).sort({ postedAt: 1 });
+}

@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { Group, Expense, User, Debt } from '../types';
 import { calculateNetBalances, simplifyDebts } from '../utils/debtSimplifier';
 import { formatAmount } from '../utils/currency';
+import TripPanel from '../features/finance/components/TripPanel';
 import {
   Plus,
   Home,
@@ -375,6 +376,8 @@ export default function GroupView({
           </div>
         </div>
       </div>
+
+      {group.category === 'trip' && <TripPanel group={group} expenses={expenses} users={allUsers} />}
 
       {/* Primary Tabs - Scrollable Pill Bar on Mobile */}
       <div className="border-b border-[#E6E1DA] flex gap-2 sm:gap-4 overflow-x-auto pb-1 no-scrollbar" id="group-tabs-row">

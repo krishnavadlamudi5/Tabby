@@ -53,6 +53,13 @@ const googleLimiter = rateLimit({
   message: { error: 'Too many sign-in attempts. Please wait a few minutes and try again.' },
 });
 
+/** Initials avatar as an inline SVG data URI (no third-party image service sees the name). */
+export function initialsAvatar(name: string): string {
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect width="96" height="96" rx="48" fill="#3C5A48"/><text x="50%" y="54%" font-family="Arial,sans-serif" font-size="38" font-weight="700" fill="#fff" text-anchor="middle" dominant-baseline="middle">${initials.replace(/[<&>"]/g, '')}</text></svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+}
+
 function newUserId(): string {
   return `u_${randomBytes(9).toString('base64url')}`;
 }
@@ -92,7 +99,7 @@ router.post('/google', googleLimiter, async (req: Request, res: Response): Promi
         id: newUserId(),
         name: profile.name || email.split('@')[0],
         email,
-        avatar: profile.picture || '',
+        avatar: profile.picture || initialsAvatar(profile.name || email),
         authProvider: 'google',
         friendIds: [],
         createdAt: new Date().toISOString(),
@@ -110,8 +117,8 @@ router.post('/google', googleLimiter, async (req: Request, res: Response): Promi
         user.name = profile.name;
         changed = true;
       }
-      if (profile.picture && !user.avatar) {
-        user.avatar = profile.picture;
+      if (!user.avatar) {
+        user.avatar = profile.picture || initialsAvatar(user.name || email);
         changed = true;
       }
       if (changed) await user.save();

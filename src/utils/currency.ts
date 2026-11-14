@@ -49,3 +49,24 @@ export function formatAmount(amount: number, currencyCode: string = 'INR', showS
   
   return `${signStr}${config.symbol}${formattedNum}`;
 }
+
+/**
+ * Finance amounts are integer paise (₹331.00 -> 33100). Convert only here,
+ * at the UI edge. Non-INR amounts use their own minor unit (cents).
+ */
+export function formatPaise(paise: number, currencyCode: string = 'INR', showSign: boolean = false): string {
+  return formatAmount(paise / 100, currencyCode, showSign);
+}
+
+/** "1,320.50" / "₹1320" -> 132050 paise, or null if it isn't a number. */
+export function rupeesToPaise(input: string): number | null {
+  const cleaned = input.replace(/[₹,\s]/g, '');
+  if (!/^\d+(\.\d{0,2})?$/.test(cleaned)) return null;
+  const [i, f = ''] = cleaned.split('.');
+  return Number(i) * 100 + Number((f + '00').slice(0, 2));
+}
+
+/** 132050 -> "1320.50" for editable inputs. */
+export function paiseToInput(paise: number): string {
+  return (paise / 100).toFixed(2).replace(/\.00$/, '');
+}

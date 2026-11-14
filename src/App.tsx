@@ -19,9 +19,11 @@ import MobileHeader from './components/layout/MobileHeader';
 import ToastContainer from './components/ToastContainer';
 import Login from './components/Login';
 import SyncIndicator from './components/SyncIndicator';
+import FinanceApp from './features/finance/FinanceApp';
+import type { FinanceTab } from './features/finance/types';
 
 // Icons & UI
-import { Grid, Users, UserPlus, Bell, Plus, Sparkles, X, Download, RefreshCw } from 'lucide-react';
+import { Grid, Users, UserPlus, Bell, Plus, Sparkles, X, Download, RefreshCw, Wallet } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from './store/useAppStore';
 import { User, Expense } from './types';
@@ -61,7 +63,8 @@ export default function App() {
     { type: 'dashboard' } | 
     { type: 'group'; id: string } | 
     { type: 'friend'; id: string } |
-    { type: 'notifications' }
+    { type: 'notifications' } |
+    { type: 'finance'; tab: FinanceTab; params?: Record<string, string> }
   >({ type: 'dashboard' });
 
   // UI States
@@ -355,6 +358,14 @@ export default function App() {
               />
             )}
 
+            {activeView.type === 'finance' && (
+              <FinanceApp
+                tab={activeView.tab}
+                params={activeView.params}
+                onNavigate={(tab, params) => setActiveView({ type: 'finance', tab, params })}
+              />
+            )}
+
             {activeView.type === 'notifications' && (
               <NotificationsView
                 currentUser={currentUser}
@@ -379,7 +390,7 @@ export default function App() {
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E6E1DA] px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.5rem)] shadow-lg flex items-center justify-around">
         <button
           onClick={() => { setActiveView({ type: 'dashboard' }); setIsMobileMenuOpen(false); }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${activeView.type === 'dashboard' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${activeView.type === 'dashboard' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
         >
           <div className={`p-1 rounded-lg ${activeView.type === 'dashboard' ? 'bg-[#EBF1ED]' : ''}`}><Grid className="w-5 h-5" /></div>
           <span className="text-[10px] tracking-tight">Dashboard</span>
@@ -391,7 +402,7 @@ export default function App() {
             else if (myGroups.length > 0) setActiveView({ type: 'group', id: myGroups[0].id });
             else setIsCreateGroupOpen(true);
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${activeView.type === 'group' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${activeView.type === 'group' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
         >
           <div className={`p-1 rounded-lg relative ${activeView.type === 'group' ? 'bg-[#EBF1ED]' : ''}`}>
             <Users className="w-5 h-5" />
@@ -421,7 +432,7 @@ export default function App() {
             else if (myFriends.length > 0) setActiveView({ type: 'friend', id: myFriends[0].id });
             else setIsAddFriendOpen(true);
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${activeView.type === 'friend' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${activeView.type === 'friend' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
         >
           <div className={`p-1 rounded-lg relative ${activeView.type === 'friend' ? 'bg-[#EBF1ED]' : ''}`}>
             <UserPlus className="w-5 h-5" />
@@ -431,8 +442,16 @@ export default function App() {
         </button>
 
         <button
+          onClick={() => { setActiveView({ type: 'finance', tab: 'home' }); setIsMobileMenuOpen(false); }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${activeView.type === 'finance' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
+        >
+          <div className={`p-1 rounded-lg ${activeView.type === 'finance' ? 'bg-[#EBF1ED]' : ''}`}><Wallet className="w-5 h-5" /></div>
+          <span className="text-[10px] tracking-tight">Money</span>
+        </button>
+
+        <button
           onClick={() => { setActiveView({ type: 'notifications' }); setIsMobileMenuOpen(false); }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${activeView.type === 'notifications' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${activeView.type === 'notifications' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
         >
           <div className={`p-1 rounded-lg relative ${activeView.type === 'notifications' ? 'bg-[#3C5A48] text-white' : ''}`}>
             <Bell className="w-5 h-5" />

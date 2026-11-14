@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Grid, Bell, Settings, Search, X, Plus, UserPlus } from 'lucide-react';
+import { Grid, Bell, Settings, Search, X, Plus, UserPlus, Wallet } from 'lucide-react';
 import AppLogo from '../AppLogo';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -145,6 +145,31 @@ export default function Sidebar({
               </span>
             )}
           </button>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold text-[#736F6A] uppercase tracking-wider px-3">Finance</span>
+          {([
+            ['home', 'Money overview'],
+            ['transactions', 'Transactions'],
+            ['review', 'Review queue'],
+            ['accounts', 'Accounts & statements'],
+            ['commitments', 'Commitments'],
+            ['insurance', 'Insurance'],
+            ['documents', 'Documents'],
+          ] as const).map(([tab, label]) => {
+            const isActive = activeView.type === 'finance' && activeView.tab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => { setActiveView({ type: 'finance', tab }); setIsMobileMenuOpen(false); }}
+                className={`flex items-center gap-3 px-3 py-1.5 rounded-xl font-semibold text-xs transition-all cursor-pointer ${isActive ? 'bg-[#EBF1ED] text-[#3C5A48]' : 'text-[#736F6A] hover:bg-[#EBF1ED]/50 hover:text-[#2C2B29]'}`}
+              >
+                {tab === 'home' ? <Wallet className="w-4 h-4" /> : <span className="w-4" />}
+                {label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="relative px-0.5">
