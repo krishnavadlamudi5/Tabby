@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Grid, Bell, Settings, Search, X, Plus, UserPlus } from 'lucide-react';
+import { LogOut, Grid, Bell, Settings, Search, X, Plus, UserPlus } from 'lucide-react';
 import AppLogo from '../AppLogo';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -26,7 +26,7 @@ export default function Sidebar({
   const groups = useAppStore(state => state.groups);
   const users = useAppStore(state => state.users);
   const activities = useAppStore(state => state.activities);
-
+  const logout = useAppStore(state => state.logout);
 
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState('');
 
@@ -113,7 +113,13 @@ export default function Sidebar({
           >
             <Settings className="w-4 h-4" />
           </button>
-
+          <button
+            onClick={() => logout()}
+            className="p-1.5 rounded-lg text-[#736F6A]/60 hover:text-[#C86D51] hover:bg-[#FDF3F0] transition-colors cursor-pointer"
+            title="Log Out"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </div>
 

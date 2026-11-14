@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import rateLimit from 'express-rate-limit';
 import { connectDB } from './db';
 
-
+import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import groupRoutes from './routes/groups';
 import expenseRoutes from './routes/expenses';
@@ -99,7 +99,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Routes
-
+app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/expenses', expenseRoutes);
