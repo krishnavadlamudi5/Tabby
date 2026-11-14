@@ -1,0 +1,12 @@
+{
+  "sender": "no-reply@rmt.flipkart.com",
+  "subject": "Your Order for Noise Smartwatch has been successfully placed",
+  "receivedAt": "2026-11-12T07:00:00Z",
+  "bodyText": "Order Confirmation\nOrder ID: OD430998877665544100\nNoise ColorFit Pro 5 Smartwatch x 1 ₹2,999\nTotal ₹2,999\nAmount Paid ₹2,999",
+  "expected": {
+    "eventType": "order",
+    "amountPaise": 299900,
+    "merchant": "Flipkart"
+  },
+  "messageId": "msg-X09-flipkart-order"
+}

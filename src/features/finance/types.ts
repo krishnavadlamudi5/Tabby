@@ -154,6 +154,7 @@ export interface Policy {
   documentIds: string[];
   notes: string;
   vehicleNumber: string;
+  renewUrl: string;
   autoAdded: boolean;
   needsCheck: boolean;
 }
@@ -195,6 +196,7 @@ export interface FinDocument {
   sizeBytes: number;
   linkedTo: { kind: 'policy' | 'transaction' | 'trip' | 'claim' | 'statement'; id: string }[];
   source: 'upload' | 'gmail';
+  expiresAt: string | null;
   createdAt: string;
 }
 
@@ -245,4 +247,25 @@ export interface Dashboard {
 }
 
 export type FinanceTab =
-  | 'home' | 'transactions' | 'review' | 'accounts' | 'commitments' | 'insurance' | 'documents' | 'categories' | 'import';
+  | 'home' | 'transactions' | 'reports' | 'review' | 'accounts' | 'commitments' | 'insurance' | 'documents' | 'categories' | 'import';
+
+export interface PremiumSummary {
+  basis: 'calendar' | 'fy';
+  years: string[];
+  rows: { policyId: string; insurer: string; type: PolicyType; planName: string; vehicleNumber: string; status: string; members: { id: string; name: string; relation: string }[]; byYear: Record<string, number>; total: number; annualPremiumPaise: number; premiumFrequency: string }[];
+  totalsByYear: Record<string, number>;
+  byType: Record<string, Record<string, number>>;
+  byPerson: Record<string, Record<string, number>>;
+  grandTotal: number;
+}
+
+export interface YearReport {
+  year: number;
+  basis: 'calendar' | 'fy';
+  label: string;
+  months: { key: string; spendPaise: number; incomePaise: number }[];
+  categories: { categoryId: string | null; name: string; color: string; perMonth: Record<string, number>; total: number }[];
+  years: { label: string; spendPaise: number; incomePaise: number }[];
+  totalSpendPaise: number;
+  totalIncomePaise: number;
+}

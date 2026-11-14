@@ -152,6 +152,7 @@ export default function Sidebar({
           {([
             ['home', 'Money overview'],
             ['transactions', 'Transactions'],
+            ['reports', 'Reports (year)'],
             ['review', 'Review queue'],
             ['accounts', 'Accounts & statements'],
             ['commitments', 'Commitments'],

@@ -30,6 +30,8 @@ export interface IPolicy {
   documentIds: Types.ObjectId[];
   notes: string;
   vehicleNumber: string;
+  /** Insurer's renewal page; overrides the built-in link. */
+  renewUrl: string;
   /** Filed automatically from an email; needsCheck until the owner opens/saves it. */
   autoAdded: boolean;
   needsCheck: boolean;
@@ -62,6 +64,7 @@ const PolicySchema = new Schema<any>({
   documentIds: { type: [Schema.Types.ObjectId], default: [] },
   notes: { type: String, default: '' },
   vehicleNumber: { type: String, default: '', uppercase: true, trim: true },
+  renewUrl: { type: String, default: '', trim: true },
   autoAdded: { type: Boolean, default: false },
   needsCheck: { type: Boolean, default: false },
   sourceRawEventId: { type: Schema.Types.ObjectId, default: null },

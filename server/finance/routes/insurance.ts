@@ -8,7 +8,10 @@ import { extractPolicy, isUsable, mergeExtractions } from '../services/insurance
 import { aiExtractPolicy, isAiConfigured } from '../services/ai/cloudflare';
 import { User } from '../../models/User';
 import { updateRaw } from '../services/insurance/filePolicy';
-import { linkPremiums, syncPremiumCommitment, taxSummary } from '../services/insurance';
+import { linkPremiums, premiumSummary, syncPremiumCommitment, taxSummary } from '../services/insurance';
+import { Transaction as Txn } from '../models';
+import { premiumPayment } from '../validation/schemas';
+import { categoryIdsByKey } from '../services/categories';
 import { financialYear } from '../lib/time';
 import { Commitment } from '../models';
 
@@ -34,6 +37,13 @@ policiesRouter.get('/', handler(async (req, res) => {
 policiesRouter.get('/tax', handler(async (req, res) => {
   const fy = typeof req.query.fy === 'string' && /^\d{4}-\d{2}$/.test(req.query.fy) ? req.query.fy : financialYear(new Date());
   res.json({ success: true, ...(await taxSummary(req.userId!, fy)) });
+}));
+
+// GET /policies/premium-summary?basis=fy|calendar&years=4
+policiesRouter.get('/premium-summary', handler(async (req, res) => {
+  const basis = req.query.basis === 'calendar' ? 'calendar' : 'fy';
+  const years = Math.min(10, Math.max(1, Number(req.query.years) || 4));
+  res.json({ success: true, ...(await premiumSummary(req.userId!, basis, years)) });
 }));
 
 // POST /policies/extract - read policy details from text (OCR'd on the phone,
@@ -109,6 +119,34 @@ policiesRouter.patch('/:id', handler(async (req, res) => {
   if (!policy) return nf(res, 'Policy');
   await syncPremiumCommitment(req.userId!, policy);
   res.json({ success: true, policy });
+}));
+
+// POST /policies/:id/payments - record a premium paid outside the tracked
+// accounts (older years, cash, someone else's card). Creates a manual
+// transaction filed under Insurance and links it.
+policiesRouter.post('/:id/payments', handler(async (req, res) => {
+  if (!isObjectId(req.params.id)) return nf(res, 'Policy');
+  const body = validate(premiumPayment, req.body, res);
+  if (!body) return;
+  const policy = await Policy.findOne({ _id: req.params.id, ...scoped(req) });
+  if (!policy) return nf(res, 'Policy');
+  const keys = await categoryIdsByKey(req.userId!);
+  const txn = await Txn.create({
+    ...scoped(req), accountId: body.accountId, postedAt: body.date, amountPaise: body.amountPaise, direction: 'debit',
+    merchant: policy.insurer, merchantRaw: policy.insurer, description: `Premium · ${policy.planName || policy.type}${body.note ? ` · ${body.note}` : ''}`,
+    kind: 'expense', status: 'settled', categoryId: keys.get('insurance') || null, categorySource: 'user', channel: 'other',
+    source: 'manual', sourceKinds: ['manual'],
+  });
+  await Policy.updateOne({ _id: policy._id }, { $addToSet: { premiumTransactionIds: txn._id } });
+  res.status(201).json({ success: true, transaction: txn });
+}));
+
+// DELETE /policies/:id/payments/:txnId - unlink (and delete if it was a manual entry)
+policiesRouter.delete('/:id/payments/:txnId', handler(async (req, res) => {
+  if (!isObjectId(req.params.id) || !isObjectId(req.params.txnId)) return nf(res, 'Payment');
+  await Policy.updateOne({ _id: req.params.id, ...scoped(req) }, { $pull: { premiumTransactionIds: req.params.txnId } });
+  await Txn.deleteOne({ _id: req.params.txnId, ...scoped(req), source: 'manual' });
+  res.json({ success: true });
 }));
 
 policiesRouter.post('/:id/link-premiums', handler(async (req, res) => {

@@ -13,11 +13,13 @@ import Commitments from './views/Commitments';
 import Insurance from './views/Insurance';
 import Documents from './views/Documents';
 import ImportView from './views/ImportView';
+import Reports from './views/Reports';
 import type { FinanceTab } from './types';
 
 export const FINANCE_TABS: { id: FinanceTab; label: string }[] = [
   { id: 'home', label: 'Overview' },
   { id: 'transactions', label: 'Transactions' },
+  { id: 'reports', label: 'Reports' },
   { id: 'review', label: 'Review' },
   { id: 'accounts', label: 'Accounts' },
   { id: 'commitments', label: 'Commitments' },
@@ -80,6 +82,7 @@ export default function FinanceApp({ tab, params, onNavigate }: {
         <>
           {tab === 'home' && <FinanceHome onNavigate={onNavigate} />}
           {tab === 'transactions' && <Transactions key={JSON.stringify(params || {})} initial={params} />}
+          {tab === 'reports' && <Reports onNavigate={onNavigate} />}
           {tab === 'review' && <ReviewQueue onNavigate={onNavigate} />}
           {tab === 'accounts' && <Accounts initial={params} />}
           {tab === 'commitments' && <Commitments />}

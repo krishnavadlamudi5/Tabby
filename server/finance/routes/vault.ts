@@ -37,6 +37,7 @@ router.post('/', upload.single('file'), handler(async (req, res) => {
       buffer: file.buffer, filename: file.originalname, mimeType: file.mimetype,
       title: fields.title || file.originalname, type: fields.type, link,
     });
+    if (fields.expiresAt) await FinDocument.updateOne({ _id: doc._id }, { $set: { expiresAt: fields.expiresAt } });
     if (link) await syncBackLink(req.userId!, link.kind, link.id, doc._id, true);
     res.status(existed ? 200 : 201).json({ success: true, document: doc, existed });
   } catch (err) {
@@ -50,6 +51,7 @@ router.get('/', handler(async (req, res) => {
   const q = req.query as Record<string, string>;
   const filter: Record<string, any> = scoped(req);
   if (q.type) filter.type = q.type;
+  if (q.expiring === '1') filter.expiresAt = { $ne: null, $lte: new Date(Date.now() + 60 * 86_400_000) };
   if (q.linkKind && q.linkId) filter.linkedTo = { $elemMatch: { kind: q.linkKind, id: q.linkId } };
   else if (q.linkKind) filter['linkedTo.kind'] = q.linkKind;
   if (q.q) {
@@ -82,6 +84,7 @@ router.patch('/:id', handler(async (req, res) => {
   if (!doc) return notFound(res);
   if (body.title) doc.title = body.title;
   if (body.type) doc.type = body.type;
+  if (body.expiresAt !== undefined) doc.expiresAt = body.expiresAt;
   if (body.link && !doc.linkedTo.some((l) => l.kind === body.link!.kind && l.id === body.link!.id)) {
     doc.linkedTo.push(body.link);
     await syncBackLink(req.userId!, body.link.kind, body.link.id, doc._id, true);

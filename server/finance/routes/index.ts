@@ -11,6 +11,7 @@ import { policiesRouter, peopleRouter, claimsRouter, docPasswordsRouter } from '
 import { commitmentsRouter, alertsRouter, dashboardRouter } from './planning';
 import tripsRouter from './trips';
 import exportRouter from './exportData';
+import reportsRouter from './reports';
 
 // Everything under /api/finance (except the HMAC-signed ingest webhook and
 // the jobs endpoint, mounted separately in server/app.ts) needs a signed-in
@@ -36,5 +37,6 @@ router.use('/alerts', alertsRouter);
 router.use('/dashboard', dashboardRouter);
 router.use('/trips', tripsRouter);
 router.use('/export', exportRouter);
+router.use('/reports', reportsRouter);
 
 export default router;

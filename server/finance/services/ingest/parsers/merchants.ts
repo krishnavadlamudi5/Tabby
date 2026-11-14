@@ -61,7 +61,7 @@ export const flipkartParser: Parser = {
         referenceIds: orderId ? [orderId] : [], orderId, occurredAt: receivedAt, sourceKind: 'merchant', channel: card ? 'card' : 'other',
       });
     }
-    return null;
+    return orderParser.parse({ sender: 'no-reply@flipkart.com', subject: '', text, receivedAt });
   },
 };
 
@@ -102,31 +102,90 @@ export const stripeParser: Parser = {
   },
 };
 
-/**
- * Grocery / quick-commerce orders (Blinkit, BigBasket, Zepto, Swiggy
- * Instamart). Reads "Item name ... x 2 ₹56" lines and the grand total.
- * Synthetic fixture (X06); real layouts may need tuning - unmatched emails
- * fall back to the review queue.
- */
-export const groceryOrderParser: Parser = {
-  name: 'grocery-order',
-  version: 1,
-  matches: (sender) => senderIs(sender, 'blinkit.com', 'bigbasket.com', 'zeptonow.com', 'zepto.co', 'swiggy.in'),
-  parse({ sender, text, receivedAt }) {
-    const total = text.match(/(?:Grand total|Order total|Total paid|Amount paid|Bill total)\s*:?\s*(?:₹|Rs\.?)\s*([\d,]+(?:\.\d+)?)/i);
-    if (!total) return null;
-    const items: { name: string; qty?: number; amountPaise?: number }[] = [];
-    for (const line of text.split('\n')) {
-      const im = line.match(/^(.+?)\s+(?:x|×|qty:?)\s*(\d+)\s+(?:₹|Rs\.?)\s*([\d,]+(?:\.\d+)?)\s*$/i);
-      if (im && !/total|charge|fee|discount|savings/i.test(im[1])) {
-        items.push({ name: im[1].trim(), qty: Number(im[2]), amountPaise: amount(im[3])! });
-      }
+// ---------------------------------------------------------------- shop orders
+
+const SHOPS: { match: string[]; name: string; grocery: boolean }[] = [
+  { match: ['blinkit.com', 'grofers'], name: 'Blinkit', grocery: true },
+  { match: ['bigbasket.com', 'bbnow'], name: 'BigBasket', grocery: true },
+  { match: ['zeptonow.com', 'zepto.co'], name: 'Zepto', grocery: true },
+  { match: ['swiggy.in', 'swiggy.com'], name: 'Swiggy Instamart', grocery: true },
+  { match: ['jiomart.com'], name: 'JioMart', grocery: true },
+  { match: ['dmart.in', 'dmartready'], name: 'DMart', grocery: true },
+  { match: ['amazon.in', 'amazon.com'], name: 'Amazon', grocery: false },
+  { match: ['flipkart.com'], name: 'Flipkart', grocery: false },
+  { match: ['myntra.com'], name: 'Myntra', grocery: false },
+  { match: ['meesho.com'], name: 'Meesho', grocery: false },
+  { match: ['ajio.com'], name: 'AJIO', grocery: false },
+  { match: ['nykaa.com'], name: 'Nykaa', grocery: false },
+  { match: ['tatacliq.com'], name: 'Tata CLiQ', grocery: false },
+  { match: ['croma.com'], name: 'Croma', grocery: false },
+  { match: ['decathlon.in'], name: 'Decathlon', grocery: false },
+];
+
+export function shopFor(sender: string) {
+  const s = sender.toLowerCase();
+  return SHOPS.find((shop) => shop.match.some((m) => s.includes(m)));
+}
+
+const TOTAL_LABELS = [
+  'grand total', 'order total', 'total amount paid', 'amount paid', 'total paid', 'you paid', 'bill total', 'total payable',
+  'net amount', 'order amount', 'total amount', 'item total', 'total',
+];
+const SKIP_ITEM = /total|charge|fee|discount|savings|saved|delivery|shipping|cashback|coupon|tax|gst|tip|donation|wallet|paid|refund|payable/i;
+const AMT = '(?:₹|rs\\.?|inr)\\s*([\\d,]+(?:\\.\\d{1,2})?)';
+
+/** The order's total: the first label (in priority order) followed by an amount. */
+export function orderTotal(text: string): number | null {
+  for (const label of TOTAL_LABELS) {
+    const m = text.match(new RegExp(`${label.replace(/ /g, '\\s+')}\\s*(?:\\(.*?\\))?\\s*:?\\s*${AMT}`, 'i'));
+    if (m) return amount(m[1]);
+  }
+  return null;
+}
+
+/** "Item ... x 2 ₹56", "Item  Qty: 1  ₹499.00", "Item ₹299" lines. */
+export function orderItems(text: string): { name: string; qty?: number; amountPaise?: number }[] {
+  const items: { name: string; qty?: number; amountPaise?: number }[] = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    let m = line.match(new RegExp(`^(.{3,120}?)\\s+(?:x|×|qty:?|quantity:?)\\s*(\\d+)\\s+${AMT}\\s*$`, 'i'));
+    if (!m) {
+      const single = line.match(new RegExp(`^(.{3,120}?)\\s*[:\\-]?\\s+${AMT}\\s*$`, 'i'));
+      if (single) m = [single[0], single[1], '1', single[2]] as unknown as RegExpMatchArray;
     }
-    const merchant = /blinkit/i.test(sender) ? 'Blinkit' : /bigbasket/i.test(sender) ? 'BigBasket' : /zepto/i.test(sender) ? 'Zepto' : 'Swiggy Instamart';
-    const orderId = text.match(/Order (?:ID|No\.?|#)\s*:?\s*(\w+)/i)?.[1];
+    if (!m || SKIP_ITEM.test(m[1]) || /^[\d\s.,₹-]+$/.test(m[1])) continue;
+    items.push({ name: m[1].replace(/\s+/g, ' ').trim(), qty: Number(m[2]), amountPaise: amount(m[3])! });
+  }
+  return items;
+}
+
+/**
+ * Order / invoice emails from shops (Amazon, Flipkart, Instamart, Zepto,
+ * BigBasket, Blinkit, Myntra, Meesho…). Reads the total and item lines and
+ * hands them to the ledger, which attaches them to the matching payment.
+ * Shipping/delivery updates without a total are ignored. Formats vary by
+ * shop; anything unread falls back to the review queue.
+ */
+export const orderParser: Parser = {
+  name: 'shop-order',
+  version: 2,
+  matches: (sender) => Boolean(shopFor(sender)),
+  parse({ sender, subject, text, receivedAt }) {
+    const shop = shopFor(sender)!;
+    if (/refund/i.test(subject) || /refund amount/i.test(text)) return null; // Flipkart refunds: own parser
+    const total = orderTotal(text);
+    const isOrder = /order|invoice|receipt|purchase|placed|confirmed|bill/i.test(`${subject} ${text.slice(0, 400)}`);
+    if (!total || !isOrder || /out for delivery|has been delivered|shipped|dispatched|arriving/i.test(subject)) {
+      return base({ eventType: 'info', merchant: shop.name, sourceKind: 'merchant' });
+    }
+    const orderId = text.match(/Order (?:ID|No\.?|Number|#)\s*:?\s*#?\s*([A-Z0-9-]{6,})/i)?.[1];
     return base({
-      eventType: 'order', amountPaise: amount(total[1])!, merchant, lineItems: items, orderId,
+      eventType: 'order', amountPaise: total, merchant: shop.name, lineItems: orderItems(text), orderId,
       referenceIds: orderId ? [orderId] : [], occurredAt: receivedAt, sourceKind: 'merchant', direction: 'debit',
+      notes: shop.grocery ? 'grocery' : 'shopping',
     });
   },
 };
+
+/** Kept for existing imports. */
+export const groceryOrderParser = orderParser;

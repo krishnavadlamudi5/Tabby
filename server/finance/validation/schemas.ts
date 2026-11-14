@@ -4,6 +4,22 @@ import { POLICY_TYPES, PREMIUM_FREQUENCIES, POLICY_STATUSES } from '../models/in
 import { DOCUMENT_TYPES, LINK_KINDS } from '../models/vault';
 import { COMMITMENT_TYPES, COMMITMENT_STATUSES, FREQUENCIES } from '../models/planning';
 
+/**
+ * Update (PATCH) schema from a create schema: every field optional and NO
+ * defaults. zod's .partial() keeps defaults, which would silently reset every
+ * field the client didn't send (e.g. a policy's premium to 0).
+ */
+function patchOf<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
+  const shape: Record<string, z.ZodTypeAny> = {};
+  for (const [key, field] of Object.entries(schema.shape)) {
+    let f: any = field;
+    while (f instanceof z.ZodDefault || f instanceof z.ZodOptional) f = f.unwrap();
+    if (f instanceof z.ZodObject) f = patchOf(f);
+    shape[key] = f.optional();
+  }
+  return z.object(shape) as unknown as z.ZodObject<{ [K in keyof T]: z.ZodOptional<any> }>;
+}
+
 // Shared building blocks
 export const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'must be an id');
 export const paise = z.number().int('must be whole paise').min(0);
@@ -28,7 +44,7 @@ export const accountCreate = z.object({
   currency: z.string().length(3).default('INR'),
   isActive: z.boolean().default(true),
 });
-export const accountUpdate = accountCreate.partial();
+export const accountUpdate = patchOf(accountCreate);
 export const statementPassword = z.object({ password: z.string().max(100) });
 
 // --- Categories, rules, templates
@@ -41,7 +57,7 @@ export const categoryCreate = z.object({
   sortOrder: z.number().int().default(0),
   budgetPaise: paise.default(0),
 });
-export const categoryUpdate = categoryCreate.partial();
+export const categoryUpdate = patchOf(categoryCreate);
 export const categoryReorder = z.object({ ids: z.array(objectId).min(1) });
 
 export const ruleCreate = z.object({
@@ -71,7 +87,7 @@ export const splitTemplateCreate = z.object({
   parts: z.array(z.object({ categoryId: objectId, percent: z.number().positive().max(100) })).min(1)
     .refine((parts) => Math.abs(parts.reduce((s, p) => s + p.percent, 0) - 100) < 0.001, 'percentages must add up to 100'),
 });
-export const splitTemplateUpdate = splitTemplateCreate.partial();
+export const splitTemplateUpdate = patchOf(splitTemplateCreate);
 
 // --- Transactions
 export const transactionCreate = z.object({
@@ -187,17 +203,19 @@ export const policyCreate = z.object({
   taxSection: z.enum(['80C', '80D']).nullable().default(null),
   notes: longText.default(''),
   vehicleNumber: z.string().trim().max(20).default(''),
+  renewUrl: z.union([z.literal(''), z.string().trim().url().max(500).refine((u) => /^https:\/\//.test(u), 'must start with https://')]).default(''),
   needsCheck: z.boolean().optional(),
   /** Review item this policy was created from: its attachments get linked and it is marked done. */
   fromRawEventId: objectId.optional(),
 });
-export const policyUpdate = policyCreate.partial();
+export const policyUpdate = patchOf(policyCreate);
 export const policyExtractBody = z.object({
   text: z.string().max(200_000).optional(),
   sender: z.string().max(300).default(''),
   subject: z.string().max(500).default(''),
   rawEventId: objectId.optional(),
 }).refine((b) => b.text || b.rawEventId, 'send text or rawEventId');
+export const premiumPayment = z.object({ amountPaise: paise.min(1), date: dateLike, accountId: objectId.nullable().default(null), note: shortText.default('') });
 export const docPasswordCreate = z.object({ label: shortText.min(1), password: z.string().min(1).max(100) });
 export const personCreate = z.object({
   name: shortText.min(1),
@@ -205,7 +223,7 @@ export const personCreate = z.object({
   dob: dateLike.optional(),
   linkedUserId: z.string().optional(),
 });
-export const personUpdate = personCreate.partial();
+export const personUpdate = patchOf(personCreate);
 export const claimCreate = z.object({
   policyId: objectId,
   date: dateLike,
@@ -216,7 +234,7 @@ export const claimCreate = z.object({
   documentIds: z.array(objectId).default([]),
   notes: longText.default(''),
 });
-export const claimUpdate = claimCreate.partial();
+export const claimUpdate = patchOf(claimCreate);
 
 // --- Documents
 export const documentFields = z.object({
@@ -224,9 +242,11 @@ export const documentFields = z.object({
   type: z.enum(DOCUMENT_TYPES).default('other'),
   linkKind: z.enum(LINK_KINDS).optional(),
   linkId: z.string().max(100).optional(),
+  expiresAt: z.union([z.literal(''), dateLike]).optional(),
 });
 export const documentUpdate = z.object({
   title: shortText.min(1).optional(),
+  expiresAt: dateLike.nullable().optional(),
   type: z.enum(DOCUMENT_TYPES).optional(),
   link: z.object({ kind: z.enum(LINK_KINDS), id: z.string().min(1) }).optional(),
   unlink: z.object({ kind: z.enum(LINK_KINDS), id: z.string().min(1) }).optional(),
@@ -252,7 +272,7 @@ export const commitmentCreate = z.object({
   status: z.enum(COMMITMENT_STATUSES).default('due'),
   policyId: objectId.nullable().default(null),
 });
-export const commitmentUpdate = commitmentCreate.partial();
+export const commitmentUpdate = patchOf(commitmentCreate);
 
 // --- Trips (extra fields on existing groups)
 export const tripUpdate = z.object({
@@ -264,3 +284,8 @@ export const tripUpdate = z.object({
 export const tripAssign = z.object({ tripId: z.string().nullable() });
 
 export const monthQuery = z.string().regex(/^\d{4}-\d{2}$/, 'month must be YYYY-MM');
+
+export const yearQuery = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  basis: z.enum(['calendar', 'fy']).default('fy'),
+});

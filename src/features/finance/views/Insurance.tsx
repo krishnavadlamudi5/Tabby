@@ -5,6 +5,9 @@ import { Badge, Button, Card, Empty, ErrorBlock, Field, Money, SectionTitle, Sel
 import { formatPaise, paiseToInput, rupeesToPaise } from '../../../utils/currency';
 import type { Claim, Person, Policy, PolicyExtraction, PolicyType } from '../types';
 import { documentToText } from '../ocr';
+import PremiumSummaryCard from '../components/PremiumSummaryCard';
+import { copyText, openExternal, renewLink } from '../insurers';
+import { ExternalLink, IndianRupee } from 'lucide-react';
 
 const TYPE_LABEL: Record<PolicyType, string> = {
   health: 'Health', term_life: 'Term life', life: 'Life', vehicle: 'Vehicle', home: 'Home', travel: 'Travel', personal_accident: 'Personal accident', other: 'Other',
@@ -31,6 +34,10 @@ export default function Insurance() {
   const [editing, setEditing] = useState<Policy | 'new' | null>(null);
   const [draft, setDraft] = useState<{ prefill: Partial<Policy>; file?: File; note?: string } | null>(null);
   const [reading, setReading] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<'type' | 'person'>('type');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const people = useAsync(() => financeApi.people(), [refreshKey]);
+  const refresh = () => { reload(); tax.reload(); setRefreshKey((k) => k + 1); };
 
   const addFromDocument = async (file: File) => {
     setReading('Reading the document…');
@@ -69,29 +76,33 @@ export default function Insurance() {
       {reading && <div className="text-xs text-[#736F6A] flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" />{reading} <span className="text-[#A39E98]">(on this device)</span></div>}
       <p className="text-[11px] text-[#736F6A] -mt-2">Policies emailed to your Gmail are filed automatically. For paper copies or other PDFs, use "Add from document" - scans are read on your phone.</p>
       {policies.length === 0 ? (
-        <Empty title="No policies yet" text="Add each health, life, vehicle or travel policy with its renewal date and premium. Tabby reminds you 30, 7 and 1 days before renewal and links premium payments automatically." action={<Button onClick={() => setEditing('new')}>Add policy</Button>} />
+        <Empty title="No policies yet" text="Policies emailed to you are added automatically. You can also add one by hand or from a PDF/photo. Tabby reminds you 30, 7 and 1 days before renewal and links premium payments." action={<Button onClick={() => setEditing('new')}>Add policy</Button>} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {policies.map((p) => (
-            <Card key={p.id} onClick={() => setOpenId(p.id)} className="flex flex-col gap-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-[#EBF1ED] text-[#3C5A48] flex items-center justify-center shrink-0"><PolicyIcon p={p} /></div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold truncate">{p.insurer}</div>
-                    <div className="text-[11px] text-[#736F6A] truncate">{TYPE_LABEL[p.type]}{p.planName ? ` · ${p.planName}` : ''}{p.vehicleNumber ? ` · ${p.vehicleNumber}` : ''}{p.policyNumber ? ` · ${p.policyNumber}` : ''}</div>
-                    {p.needsCheck && <span className="inline-flex mt-0.5"><Badge tone="blue"><Sparkles className="w-2.5 h-2.5" />Auto-added · tap to check</Badge></span>}
-                  </div>
-                </div>
-                <RenewalBadge date={p.renewalDate} status={p.status} />
+        <>
+          <PremiumSummaryCard refreshKey={refreshKey} />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold text-[#736F6A] uppercase tracking-wider">{policies.length} {policies.length === 1 ? 'policy' : 'policies'}</span>
+            <div className="inline-flex rounded-xl border border-[#E6E1DA] p-0.5 bg-[#FAF8F5]">
+              {(['type', 'person'] as const).map((g) => (
+                <button key={g} type="button" onClick={() => setGroupBy(g)}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg cursor-pointer ${groupBy === g ? 'bg-white shadow-xs text-[#3C5A48]' : 'text-[#736F6A]'}`}>
+                  By {g === 'type' ? 'type' : 'person'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {groupPolicies(policies, groupBy, people.data?.people || []).map(([group, list]) => (
+            <div key={group} className="flex flex-col gap-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-extrabold">{group}</span>
+                <span className="text-[11px] text-[#736F6A]">{list.length} · {formatPaise(list.reduce((s, p) => s + yearlyPremium(p), 0))}/year</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div><div className="text-[10px] text-[#736F6A] uppercase font-bold">Cover</div><b>{formatPaise(p.sumInsuredPaise)}</b></div>
-                <div><div className="text-[10px] text-[#736F6A] uppercase font-bold">Premium</div><b>{formatPaise(p.premiumPaise)}</b> <span className="text-[#736F6A]">/{p.premiumFrequency.replace('_', ' ')}</span></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {list.map((p) => <PolicyCard key={p.id} p={p} onOpen={() => setOpenId(p.id)} />)}
               </div>
-            </Card>
+            </div>
           ))}
-        </div>
+        </>
       )}
 
       {tax.data && (tax.data.rows.length > 0) && (
@@ -107,9 +118,9 @@ export default function Insurance() {
 
       <PdfPasswords />
 
-      {openId && <PolicyDetail id={openId} onClose={() => setOpenId(null)} onEdit={(p) => { setOpenId(null); setEditing(p); }} onChanged={() => { reload(); tax.reload(); }} />}
-      {editing && <PolicyForm policy={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload(); tax.reload(); }} />}
-      {draft && <PolicyForm policy={null} prefill={draft.prefill} pendingFile={draft.file} note={draft.note} onClose={() => setDraft(null)} onSaved={() => { setDraft(null); reload(); tax.reload(); }} />}
+      {openId && <PolicyDetail id={openId} onClose={() => setOpenId(null)} onEdit={(p) => { setOpenId(null); setEditing(p); }} onChanged={refresh} />}
+      {editing && <PolicyForm policy={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh(); }} />}
+      {draft && <PolicyForm policy={null} prefill={draft.prefill} pendingFile={draft.file} note={draft.note} onClose={() => setDraft(null)} onSaved={() => { setDraft(null); refresh(); }} />}
     </div>
   );
 }
@@ -117,6 +128,7 @@ export default function Insurance() {
 function PolicyDetail({ id, onClose, onEdit, onChanged }: { id: string; onClose: () => void; onEdit: (p: Policy) => void; onChanged: () => void }) {
   const { data, error, loading, reload } = useAsync(() => financeApi.policy(id), [id]);
   const [claimFor, setClaimFor] = useState<Claim | 'new' | null>(null);
+  const [paying, setPaying] = useState(false);
   const [busy, setBusy] = useState(false);
   if (loading && !data) return <Sheet title="Policy" onClose={onClose}><Spinner /></Sheet>;
   if (error || !data) return <Sheet title="Policy" onClose={onClose}><ErrorBlock message={error || 'Not found'} /></Sheet>;
@@ -151,7 +163,7 @@ function PolicyDetail({ id, onClose, onEdit, onChanged }: { id: string; onClose:
           <Button size="sm" onClick={async () => { try { await financeApi.updatePolicy(p.id, { needsCheck: false }); reload(); onChanged(); } catch (e) { toastError(e); } }}><CheckCircle2 className="w-3.5 h-3.5" /> Looks right</Button>
         </div>
       )}
-      <div className="flex items-center gap-2"><RenewalBadge date={p.renewalDate} status={p.status} /><Badge>{p.status.replace('_', ' ')}</Badge></div>
+      <div className="flex items-center gap-2 flex-wrap"><RenewalBadge date={p.renewalDate} status={p.status} /><Badge>{p.status.replace('_', ' ')}</Badge><RenewButton p={p} /></div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
         {rows.map(([k, v]) => <div key={k}><div className="text-[10px] text-[#736F6A] uppercase font-bold">{k}</div><div className="font-semibold break-words">{v}</div></div>)}
       </div>
@@ -169,10 +181,21 @@ function PolicyDetail({ id, onClose, onEdit, onChanged }: { id: string; onClose:
       </div>
 
       <div>
-        <SectionTitle action={<Button size="sm" variant="ghost" onClick={async () => { try { const r = await financeApi.linkPremiums(p.id); toastOk(`${r.linked} payment(s) found`); reload(); onChanged(); } catch (e) { toastError(e); } }}><Link2 className="w-3.5 h-3.5" /> Find payments</Button>}>Premium history</SectionTitle>
-        {data.premiums.length === 0 ? <span className="text-xs text-[#736F6A]">Payments to {p.insurer} of about {formatPaise(p.premiumPaise)} are linked automatically.</span> : data.premiums.map((t) => (
-          <div key={t.id} className="flex justify-between text-xs py-1"><span>{fmtDate(t.postedAt)} · {t.merchant}</span><Money paise={t.amountPaise} /></div>
+        <SectionTitle action={<div className="flex gap-1">
+          <Button size="sm" variant="ghost" onClick={async () => { try { const r = await financeApi.linkPremiums(p.id); toastOk(`${r.linked} payment(s) found`); reload(); onChanged(); } catch (e) { toastError(e); } }}><Link2 className="w-3.5 h-3.5" /> Find</Button>
+          <Button size="sm" variant="ghost" onClick={() => setPaying(true)}><IndianRupee className="w-3.5 h-3.5" /> Record payment</Button>
+        </div>}>Premium history</SectionTitle>
+        {data.premiums.length === 0 ? <span className="text-xs text-[#736F6A]">Payments to {p.insurer} of about {formatPaise(p.premiumPaise)} are linked automatically. Add older years with "Record payment".</span> : data.premiums.map((t) => (
+          <div key={t.id} className="flex items-center gap-2 text-xs py-1">
+            <span className="flex-1 truncate">{fmtDate(t.postedAt)} · {t.merchant}{t.source === 'manual' ? ' · recorded' : ''}</span>
+            <Money paise={t.amountPaise} />
+            <button type="button" aria-label="Remove payment" className="p-1 text-[#A39E98] hover:text-[#C86D51] cursor-pointer" onClick={async () => {
+              if (!window.confirm(t.source === 'manual' ? 'Delete this recorded payment?' : 'Unlink this payment from the policy?')) return;
+              await financeApi.removePremiumPayment(p.id, t.id); reload(); onChanged();
+            }}><Trash2 className="w-3 h-3" /></button>
+          </div>
         ))}
+        {paying && <RecordPayment policy={p} onClose={() => setPaying(false)} onSaved={() => { setPaying(false); reload(); onChanged(); }} />}
       </div>
 
       <div>
@@ -235,6 +258,7 @@ export function PolicyForm({ policy, prefill, pendingFile, fromRawEventId, note,
     claimHelpline: policy?.claimHelpline || '', agentName: policy?.agent?.name || '', agentPhone: policy?.agent?.phone || '', agentEmail: policy?.agent?.email || '',
     taxSection: policy?.taxSection || '', notes: policy?.notes || '', members: policy?.insuredMemberIds || [] as string[],
     vehicleNumber: policy?.vehicleNumber || '',
+    renewUrl: policy?.renewUrl || '',
   });
   const isNew = !policy?.id;
   const [newPerson, setNewPerson] = useState({ name: '', relation: 'self' });
@@ -249,7 +273,7 @@ export function PolicyForm({ policy, prefill, pendingFile, fromRawEventId, note,
       ...(f.startDate ? { startDate: `${f.startDate}T00:00:00+05:30` } : {}), ...(f.renewalDate ? { renewalDate: `${f.renewalDate}T00:00:00+05:30` } : {}),
       status: f.status, nominee: f.nominee, tpa: f.tpa, claimHelpline: f.claimHelpline,
       agent: { name: f.agentName || undefined, phone: f.agentPhone || undefined, email: f.agentEmail || undefined },
-      taxSection: f.taxSection || null, notes: f.notes, insuredMemberIds: f.members, vehicleNumber: f.vehicleNumber,
+      taxSection: f.taxSection || null, notes: f.notes, insuredMemberIds: f.members, vehicleNumber: f.vehicleNumber, renewUrl: f.renewUrl.trim(),
       ...(isNew && fromRawEventId ? { fromRawEventId } : {}),
     };
     setBusy(true);
@@ -318,6 +342,9 @@ export function PolicyForm({ policy, prefill, pendingFile, fromRawEventId, note,
           }}><UserPlus className="w-3.5 h-3.5" /></Button>
         </div>
       </div>
+      <Field label="Renewal link (optional)" hint={`Leave empty to use ${renewLink({ insurer: f.insurer || 'the insurer', renewUrl: '' }).official ? "the insurer's official site" : 'a web search'}. Must start with https://`}>
+        <TextInput value={f.renewUrl} onChange={set('renewUrl')} placeholder="https://…" />
+      </Field>
       <Field label="Notes"><TextArea value={f.notes} onChange={set('notes')} placeholder="Waiting periods, exclusions, network hospitals…" /></Field>
     </Sheet>
   );
@@ -363,5 +390,91 @@ function PdfPasswords() {
         }}>Save</Button>
       </div>
     </Card>
+  );
+}
+
+const yearlyPremium = (p: Policy) => {
+  const factor = { monthly: 12, quarterly: 4, half_yearly: 2, yearly: 1, single: 0 }[p.premiumFrequency] ?? 1;
+  return p.premiumPaise * factor;
+};
+
+const RELATION_ORDER = ['self', 'spouse', 'son', 'daughter', 'father', 'mother', 'other'];
+
+/** Sections for the list: by insurance type, or by who is covered (a family policy appears under each person). */
+function groupPolicies(policies: Policy[], by: 'type' | 'person', people: Person[]): [string, Policy[]][] {
+  const groups = new Map<string, Policy[]>();
+  const add = (k: string, p: Policy) => groups.set(k, [...(groups.get(k) || []), p]);
+  for (const p of policies) {
+    if (by === 'type') {
+      add(p.type === 'vehicle' ? (/car/i.test(p.planName) ? 'Car' : /two|bike/i.test(p.planName) ? 'Bike' : 'Vehicle') : TYPE_LABEL[p.type], p);
+    } else {
+      const members = p.insuredMemberIds.map((id) => people.find((x) => x.id === id)).filter(Boolean) as Person[];
+      if (!members.length) add(p.type === 'vehicle' ? 'Vehicles' : 'Not set', p);
+      for (const m of members) add(`${m.name} · ${m.relation}`, p);
+    }
+  }
+  const rank = (k: string) => {
+    const rel = k.split(' · ')[1];
+    return rel ? RELATION_ORDER.indexOf(rel) : k === 'Vehicles' ? 50 : 99;
+  };
+  return Array.from(groups.entries()).sort((a, b) => (by === 'person' ? rank(a[0]) - rank(b[0]) : a[0].localeCompare(b[0])));
+}
+
+function PolicyCard({ p, onOpen }: { key?: string; p: Policy; onOpen: () => void }) {
+  return (
+    <Card onClick={onOpen} className="flex flex-col gap-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-[#EBF1ED] text-[#3C5A48] flex items-center justify-center shrink-0"><PolicyIcon p={p} /></div>
+          <div className="min-w-0">
+            <div className="text-xs font-bold truncate">{p.insurer}</div>
+            <div className="text-[11px] text-[#736F6A] truncate">{TYPE_LABEL[p.type]}{p.planName ? ` · ${p.planName}` : ''}{p.vehicleNumber ? ` · ${p.vehicleNumber}` : ''}{p.policyNumber ? ` · ${p.policyNumber}` : ''}</div>
+            {p.needsCheck && <span className="inline-flex mt-0.5"><Badge tone="blue"><Sparkles className="w-2.5 h-2.5" />Auto-added · tap to check</Badge></span>}
+          </div>
+        </div>
+        <RenewalBadge date={p.renewalDate} status={p.status} />
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div><div className="text-[10px] text-[#736F6A] uppercase font-bold">{p.type === 'vehicle' ? 'IDV' : 'Cover'}</div><b>{formatPaise(p.sumInsuredPaise)}</b></div>
+        <div><div className="text-[10px] text-[#736F6A] uppercase font-bold">Premium</div><b>{formatPaise(p.premiumPaise)}</b> <span className="text-[#736F6A]">/{p.premiumFrequency.replace('_', ' ')}</span></div>
+      </div>
+      {(() => {
+        const d = daysTo(p.renewalDate);
+        return d !== null && d <= 45 && p.status !== 'cancelled' ? <div onClick={(e) => e.stopPropagation()}><RenewButton p={p} /></div> : null;
+      })()}
+    </Card>
+  );
+}
+
+/** Opens the insurer's official renewal site; copies the policy number first so it can be pasted there. */
+function RenewButton({ p }: { p: Policy }) {
+  const link = renewLink(p);
+  return (
+    <Button size="sm" variant="secondary" onClick={async () => {
+      if (p.policyNumber && (await copyText(p.policyNumber))) toastOk(`Policy number ${p.policyNumber} copied - paste it on the renewal page`);
+      await openExternal(link.url);
+    }}>
+      <ExternalLink className="w-3.5 h-3.5" /> Renew{link.official ? '' : ' (search)'}
+    </Button>
+  );
+}
+
+function RecordPayment({ policy, onClose, onSaved }: { policy: Policy; onClose: () => void; onSaved: () => void }) {
+  const [amount, setAmount] = useState(policy.premiumPaise ? paiseToInput(policy.premiumPaise) : '');
+  const [date, setDate] = useState(toDateInput(new Date().toISOString()));
+  const [note, setNote] = useState('');
+  return (
+    <Sheet title={`Record a premium · ${policy.insurer}`} onClose={onClose} footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={async () => {
+      const paise = rupeesToPaise(amount);
+      if (!paise) { toastError(new Error('Enter the amount paid')); return; }
+      try { await financeApi.addPremiumPayment(policy.id, { amountPaise: paise, date: `${date}T12:00:00+05:30`, note }); toastOk('Payment recorded'); onSaved(); } catch (e) { toastError(e); }
+    }}>Save</Button></>}>
+      <p className="text-xs text-[#736F6A]">For premiums paid before you started using Tabby, in cash, or from an account Tabby doesn't track. It counts towards the year totals and tax view.</p>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Amount (₹)"><TextInput inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></Field>
+        <Field label="Paid on"><TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+      </div>
+      <Field label="Note (optional)"><TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. paid by Dad's card" /></Field>
+    </Sheet>
   );
 }

@@ -301,8 +301,9 @@ function ShareAndTrip({ txn, onChanged }: { txn: Transaction; onChanged: (t: Tra
                 {groups.filter((g) => g.members.includes(currentUser.id)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </Select>
             </Field>
+            <AddPerson onAdded={(id) => setSelected((s) => (s.includes(id) ? s : [...s, id]))} />
             <div className="flex flex-wrap gap-1.5">
-              {choices.length === 0 && <span className="text-xs text-[#736F6A]">Add friends first.</span>}
+              {choices.length === 0 && <span className="text-xs text-[#736F6A]">No friends yet - add someone above.</span>}
               {choices.map((u) => {
                 const on = selected.includes(u.id);
                 return (
@@ -336,3 +337,42 @@ function ShareAndTrip({ txn, onChanged }: { txn: Transaction; onChanged: (t: Tra
 }
 
 export { ExternalLink };
+
+/**
+ * Add someone to split with: if their email belongs to a Tabby user they're
+ * linked (and see the expense in their app); otherwise just a name is enough
+ * and they appear as a contact you can settle with later.
+ */
+function AddPerson({ onAdded }: { onAdded: (userId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (!open) return <button type="button" className="self-start text-[11px] font-bold text-[#3C5A48] cursor-pointer" onClick={() => setOpen(true)}>+ Add someone (by name or email)</button>;
+  return (
+    <div className="flex flex-col gap-2 p-3 rounded-xl bg-[#FAF8F5] border border-[#E6E1DA]">
+      <div className="grid grid-cols-2 gap-2">
+        <TextInput placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+        <TextInput placeholder="Email (optional)" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </div>
+      <span className="text-[10px] text-[#736F6A]">If they use Tabby with this email, they'll see the expense in their app. Without an email they're saved as a contact.</span>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+        <Button size="sm" busy={busy} disabled={!name.trim()} onClick={async () => {
+          setBusy(true);
+          try {
+            const before = new Set(useAppStore.getState().users.map((u) => u.id));
+            await useAppStore.getState().addFriend(name.trim(), email.trim());
+            const added = useAppStore.getState().users.find((u) => !before.has(u.id) || (email && u.email?.toLowerCase() === email.trim().toLowerCase()));
+            if (added) onAdded(added.id);
+            setName(''); setEmail(''); setOpen(false);
+          } catch (e) {
+            toastError(e);
+          } finally {
+            setBusy(false);
+          }
+        }}>Add</Button>
+      </div>
+    </div>
+  );
+}

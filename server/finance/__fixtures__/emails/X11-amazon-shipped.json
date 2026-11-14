@@ -1,0 +1,10 @@
+{
+  "sender": "shipment-tracking@amazon.in",
+  "subject": "Your Amazon.in order has been shipped",
+  "receivedAt": "2026-11-12T09:00:00Z",
+  "bodyText": "Your package with boAt Airdopes is on the way. Order total ₹2,398.00",
+  "expected": {
+    "eventType": "info"
+  },
+  "messageId": "msg-X11-amazon-shipped"
+}

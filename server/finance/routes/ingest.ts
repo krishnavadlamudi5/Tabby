@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import express from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { User } from '../../models/User';
-import { Account, IAccount, RawEvent } from '../models';
+import { Account, FinDocument, IAccount, RawEvent, Transaction } from '../models';
 import { handler, scoped, validate } from '../lib/http';
 import { emailIngest, manualIngest } from '../validation/schemas';
 import { ingestEmail } from '../services/ingest/pipeline';
@@ -134,6 +134,18 @@ emailIngestRouter.post('/', async (req: Request, res: Response) => {
       receivedAt: body.date || new Date(), bodyText: body.bodyText, attachmentsMeta,
     });
     if (result.duplicate) { res.status(409).json({ error: 'already_ingested' }); return; }
+
+    // Invoices attached to an order/payment email belong to that payment.
+    if (result.transactionIds.length && otherPdfs.length && result.detectedType !== 'policy') {
+      const txnId = result.transactionIds[0];
+      for (const p of otherPdfs) {
+        await FinDocument.updateOne(
+          { _id: p.documentId, ownerId, 'linkedTo.id': { $ne: txnId } },
+          { $push: { linkedTo: { kind: 'transaction', id: txnId } }, ...(p.type === 'other' ? { $set: { type: 'invoice' } } : {}) },
+        );
+        await Transaction.updateOne({ _id: txnId, ownerId }, { $addToSet: { attachmentDocIds: p.documentId } });
+      }
+    }
 
     // Insurance emails: file the policy automatically (with its PDF).
     let policy: { id: string; created: boolean } | null = null;

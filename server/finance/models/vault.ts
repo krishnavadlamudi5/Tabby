@@ -18,6 +18,8 @@ export interface IDocument {
   linkedTo: { kind: (typeof LINK_KINDS)[number]; id: string }[];
   extractedFields: Record<string, any> | null;
   source: 'upload' | 'gmail';
+  /** Warranty end, PUC/licence/passport expiry… reminders 30 and 7 days before. */
+  expiresAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +37,7 @@ const DocumentSchema = new Schema<any>({
   linkedTo: { type: [{ kind: { type: String, enum: LINK_KINDS }, id: String, _id: false }], default: [] },
   extractedFields: { type: Schema.Types.Mixed, default: null },
   source: { type: String, enum: ['upload', 'gmail'], default: 'upload' },
+  expiresAt: { type: Date, default: null, index: true },
 }, financeSchemaOptions(['storageKey', 'encryption']));
 DocumentSchema.index({ ownerId: 1, sha256: 1 }, { unique: true });
 DocumentSchema.index({ ownerId: 1, 'linkedTo.kind': 1, 'linkedTo.id': 1 });

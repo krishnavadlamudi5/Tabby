@@ -348,23 +348,42 @@ async function createExpectedRefund(ownerId: string, raw: IRawEvent, ext: Extrac
 
 // ---------------------------------------------------------------- orders -> auto split
 
-function merchantsMatch(a: string, b: string): boolean {
-  const x = normaliseMerchant(a);
-  const y = normaliseMerchant(b);
-  if (!x || !y) return true; // a bank alert without a merchant can still match by amount/time
-  return x.includes(y) || y.includes(x);
+const GATEWAY = /razorpay|payu|billdesk|ccavenue|cashfree|paytm|phonepe|gpay|upi/i;
+
+/** Does a payment (by its merchant or the bank's raw text) look like it's for this shop? */
+function merchantsMatch(txn: { merchant?: string; merchantRaw?: string }, shop: string): boolean {
+  const y = normaliseMerchant(shop);
+  if (!y) return true;
+  const names = [txn.merchant, txn.merchantRaw].map((m) => normaliseMerchant(m)).filter(Boolean);
+  if (!names.length) return true; // alert without a merchant: amount and time decide
+  if (names.some((x) => x.includes(y) || y.includes(x) || x.split(' ')[0] === y.split(' ')[0])) return true;
+  // Paid through a gateway that doesn't name the shop.
+  return [txn.merchant, txn.merchantRaw].every((m) => !m || GATEWAY.test(m));
 }
 
 async function applyOrderSplit(ownerId: string, txn: ITransaction, raw: IRawEvent, ext: Extraction): Promise<void> {
-  if (txn.categorySource === 'user' || txn.splits.length) return;
   const keys = await categoryIdsByKey(ownerId);
-  const parts = ext.lineItems?.length ? autoSplitLineItems(txn.amountPaise, ext.lineItems, keys) : [];
-  const set: Record<string, any> = { categoryId: keys.get('groceries') || txn.categoryId };
-  if (parts.length) {
-    set.splits = parts;
-    set.categorySource = 'split';
+  const isGrocery = ext.notes === 'grocery';
+  const set: Record<string, any> = {};
+  // A gateway descriptor ("Razorpay", "PYU*...") is less useful than the shop name.
+  if (!txn.merchant || /razorpay|payu|billdesk|ccavenue|cashfree|paytm|phonepe/i.test(txn.merchant)) set.merchant = ext.merchant;
+  if (txn.categorySource !== 'user' && !txn.splits.length) {
+    if (isGrocery) {
+      const parts = ext.lineItems?.length ? autoSplitLineItems(txn.amountPaise, ext.lineItems, keys) : [];
+      set.categoryId = keys.get('groceries') || txn.categoryId;
+      if (parts.length) {
+        set.splits = parts;
+        set.categorySource = 'split';
+      }
+    } else if (!txn.categoryId) {
+      set.categoryId = keys.get('shopping') || null;
+      set.categorySource = 'dictionary';
+    }
   }
-  await Transaction.updateOne({ _id: txn._id }, { $set: set, $addToSet: { rawEventIds: raw._id, sourceKinds: 'merchant' } });
+  if (ext.lineItems?.length && !txn.description) {
+    set.description = ext.lineItems.slice(0, 3).map((i) => i.name).join(', ') + (ext.lineItems.length > 3 ? ` +${ext.lineItems.length - 3} more` : '');
+  }
+  await Transaction.updateOne({ _id: txn._id }, { $set: set, $addToSet: { rawEventIds: raw._id, sourceKinds: 'merchant', tags: 'online-order', ...(ext.orderId ? { referenceIds: ext.orderId } : {}) } });
   await RawEvent.updateOne({ _id: raw._id }, { $set: { 'extracted.attachedTransactionId': String(txn._id), status: 'parsed', reviewReason: '' }, $addToSet: { transactionIds: txn._id } });
 }
 
@@ -376,7 +395,7 @@ async function attachOrderToPayment(ownerId: string, raw: IRawEvent, ext: Extrac
     amountPaise: { $gte: ext.amountPaise! - 100, $lte: ext.amountPaise! + 100 },
     postedAt: { $gte: addDays(when, -2), $lte: addDays(when, 2) },
   });
-  const txn = candidates.find((c) => merchantsMatch(c.merchant || c.merchantRaw, ext.merchant || ''));
+  const txn = candidates.find((c) => merchantsMatch(c, ext.merchant || ''));
   if (!txn) return null;
   await applyOrderSplit(ownerId, txn, raw, ext);
   return String(txn._id);
@@ -391,7 +410,7 @@ async function attachPendingOrders(ownerId: string, txn: ITransaction): Promise<
   for (const raw of orders) {
     const ext = raw.extracted as Extraction;
     if (!ext?.amountPaise || Math.abs(ext.amountPaise - txn.amountPaise) > 100) continue;
-    if (!merchantsMatch(txn.merchant || txn.merchantRaw, ext.merchant || '')) continue;
+    if (!merchantsMatch(txn, ext.merchant || '')) continue;
     await applyOrderSplit(ownerId, txn, raw, ext);
     return;
   }

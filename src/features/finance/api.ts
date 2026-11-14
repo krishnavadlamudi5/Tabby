@@ -1,6 +1,6 @@
 import { apiDownload, apiRequest } from '../../lib/api';
 import type {
-  Account, Alert, Category, Claim, Commitment, Dashboard, FinDocument, Person, Policy, PolicyExtraction, ReviewEvent, Rule, SplitTemplate, Statement, Transaction,
+  Account, Alert, Category, Claim, Commitment, Dashboard, FinDocument, Person, Policy, PolicyExtraction, PremiumSummary, ReviewEvent, YearReport, Rule, SplitTemplate, Statement, Transaction,
 } from './types';
 
 const F = '/finance';
@@ -77,6 +77,10 @@ export const financeApi = {
   docPasswords: () => apiRequest<{ passwords: { id: string; label: string }[] }>(`${F}/doc-passwords`),
   addDocPassword: (label: string, password: string) => apiRequest(`${F}/doc-passwords`, { method: 'POST', body: { label, password } }),
   deleteDocPassword: (id: string) => apiRequest(`${F}/doc-passwords/${id}`, { method: 'DELETE' }),
+  premiumSummary: (basis: 'fy' | 'calendar', years = 4) => apiRequest<PremiumSummary>(`${F}/policies/premium-summary${qs({ basis, years })}`),
+  addPremiumPayment: (id: string, body: Record<string, unknown>) => apiRequest(`${F}/policies/${id}/payments`, { method: 'POST', body }),
+  removePremiumPayment: (id: string, txnId: string) => apiRequest(`${F}/policies/${id}/payments/${txnId}`, { method: 'DELETE' }),
+  yearReport: (year: number, basis: 'fy' | 'calendar') => apiRequest<YearReport>(`${F}/reports/year${qs({ year, basis })}`),
   linkPremiums: (id: string) => apiRequest<{ linked: number }>(`${F}/policies/${id}/link-premiums`, { method: 'POST', body: {} }),
   tax: (fy?: string) => apiRequest<{ fy: string; rows: { policyId: string; insurer: string; planName: string; section: string; paidPaise: number; payments: number }[]; totals: { '80C': number; '80D': number } }>(`${F}/policies/tax${qs({ fy })}`),
   people: () => apiRequest<{ people: Person[] }>(`${F}/people`),
@@ -86,7 +90,7 @@ export const financeApi = {
   updateClaim: (id: string, body: Record<string, unknown>) => apiRequest<{ claim: Claim }>(`${F}/claims/${id}`, { method: 'PATCH', body }),
   deleteClaim: (id: string) => apiRequest(`${F}/claims/${id}`, { method: 'DELETE' }),
 
-  documents: (f: { q?: string; type?: string; linkKind?: string; linkId?: string } = {}) => apiRequest<{ documents: FinDocument[] }>(`${F}/documents${qs(f)}`),
+  documents: (f: { q?: string; type?: string; linkKind?: string; linkId?: string; expiring?: string } = {}) => apiRequest<{ documents: FinDocument[] }>(`${F}/documents${qs(f)}`),
   uploadDocument: (form: FormData) => apiRequest<{ document: FinDocument; existed: boolean }>(`${F}/documents`, { method: 'POST', body: form }),
   updateDocument: (id: string, body: Record<string, unknown>) => apiRequest<{ document: FinDocument }>(`${F}/documents/${id}`, { method: 'PATCH', body }),
   deleteDocument: (id: string) => apiRequest(`${F}/documents/${id}`, { method: 'DELETE' }),

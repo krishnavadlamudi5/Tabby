@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Search, ArrowLeftRight, Ban, Clock, Split, Users, Plane } from 'lucide-react';
+import { Plus, Search, ArrowLeftRight, Ban, Clock, Split, Users, Plane, Download } from 'lucide-react';
+import { downloadCSV } from '../../../utils/export';
 import { financeApi } from '../api';
 import { useFinanceStore, categoryLabel, categoryColor } from '../store';
 import {
@@ -17,6 +18,7 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
   const [categoryId, setCategoryId] = useState(initial?.categoryId || '');
   const [kind, setKind] = useState(initial?.kind || '');
   const [status, setStatus] = useState(initial?.status || '');
+  const [tag, setTag] = useState(initial?.tag || '');
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
   const [includeExcluded, setIncludeExcluded] = useState(false);
@@ -33,7 +35,7 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
     return () => clearTimeout(t);
   }, [q]);
 
-  const filters = { month, accountId, categoryId, kind, status, q: query, includeExcluded };
+  const filters = { month, accountId, categoryId, kind, status, tag, q: query, includeExcluded };
   const load = async (more = false) => {
     setLoading(true);
     setError(null);
@@ -49,7 +51,7 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
     }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void load(false); }, [month, accountId, categoryId, kind, status, query, includeExcluded]);
+  useEffect(() => { void load(false); }, [month, accountId, categoryId, kind, status, tag, query, includeExcluded]);
 
   const byDay = useMemo(() => {
     const groups = new Map<string, Transaction[]>();
@@ -64,7 +66,28 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <MonthSwitcher month={month} onChange={setMonth} />
-        <Button size="sm" onClick={() => setAdding(true)}><Plus className="w-3.5 h-3.5" /> Add</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="secondary" onClick={async () => {
+            try {
+              const all: Transaction[] = [];
+              let c: string | undefined;
+              for (let i = 0; i < 20; i++) {
+                const r = await financeApi.transactions({ ...filters, cursor: c, limit: 200 });
+                all.push(...r.transactions);
+                if (!r.nextCursor) break;
+                c = r.nextCursor;
+              }
+              downloadCSV(`tabby_transactions_${month}.csv`, [
+                ['Date', 'Merchant', 'Description', 'Category', 'Account', 'Kind', 'Status', 'Direction', 'Amount (INR)', 'My share (INR)', 'Tags', 'Notes'],
+                ...all.map((t) => [t.postedAt.slice(0, 10), t.merchant, t.description, t.splits.length ? t.splits.map((p) => `${categoryLabel(categories, p.categoryId)} ${(p.amountPaise / 100).toFixed(2)}`).join('; ') : categoryLabel(categories, t.categoryId),
+                  accountLabel(accounts.find((a) => a.id === t.accountId)), t.kind, t.status, t.direction, (t.amountPaise / 100).toFixed(2), t.mySharePaise !== null ? (t.mySharePaise / 100).toFixed(2) : '', t.tags.join(' '), t.notes]),
+              ]);
+            } catch (e) {
+              toastError(e);
+            }
+          }}><Download className="w-3.5 h-3.5" /> CSV</Button>
+          <Button size="sm" onClick={() => setAdding(true)}><Plus className="w-3.5 h-3.5" /> Add</Button>
+        </div>
       </div>
 
       <Card className="flex flex-col gap-2 !p-3">
@@ -85,6 +108,12 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
             <option value="pending">Pending</option>
             <option value="declined">Declined</option>
           </Select>
+        </div>
+        <div className="flex gap-1.5 flex-wrap">
+          {[['', 'All'], ['online-order', 'Online orders']].map(([v, l]) => (
+            <button key={v} type="button" onClick={() => setTag(v)}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer ${tag === v ? 'bg-[#3C5A48] text-white border-[#3C5A48]' : 'bg-white border-[#E6E1DA] text-[#736F6A]'}`}>{l}</button>
+          ))}
         </div>
         <label className="flex items-center gap-2 text-[11px] text-[#736F6A] cursor-pointer select-none">
           <input type="checkbox" checked={includeExcluded} onChange={(e) => setIncludeExcluded(e.target.checked)} />

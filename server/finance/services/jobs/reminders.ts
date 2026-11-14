@@ -1,4 +1,4 @@
-import { Policy, RawEvent } from '../../models';
+import { FinDocument, Policy, RawEvent } from '../../models';
 import { formatPaiseINR } from '../../lib/money';
 import { addDays, daysBetween } from '../../lib/time';
 import { raiseAlert } from '../alerts';
@@ -27,6 +27,26 @@ export async function renewalReminders(now = new Date(), ownerId?: string): Prom
       body: `${p.planName || p.type} · premium ${formatPaiseINR(p.premiumPaise)} · renewal ${p.renewalDate!.toISOString().slice(0, 10)}`,
       dueAt: p.renewalDate, entity: { kind: 'policy', id: String(p._id) },
       dedupeKey: `renewal-${step}:${p._id}:${p.renewalDate!.toISOString().slice(0, 10)}`, email: true,
+    });
+    if (a) raised += 1;
+  }
+  return raised;
+}
+
+/** Warranties, PUC, licences, passports: reminders 30 and 7 days before expiry, and on expiry. */
+export async function documentExpiryReminders(now = new Date(), ownerId?: string): Promise<number> {
+  const docs = await FinDocument.find({ ...(ownerId ? { ownerId } : {}), expiresAt: { $ne: null, $gte: addDays(now, -1), $lte: addDays(now, 31) } });
+  let raised = 0;
+  for (const d of docs) {
+    const days = daysBetween(now, d.expiresAt!);
+    const step = [30, 7, 0].filter((s) => days <= s).sort((a, b) => a - b)[0];
+    if (step === undefined) continue;
+    const a = await raiseAlert(d.ownerId, {
+      type: 'document_expiry',
+      title: days <= 0 ? `${d.title} expires today` : `${d.title} expires in ${days} day${days === 1 ? '' : 's'}`,
+      body: `${d.type.replace('_', ' ')} · expires ${d.expiresAt!.toISOString().slice(0, 10)}`,
+      dueAt: d.expiresAt!, entity: { kind: 'document', id: String(d._id) },
+      dedupeKey: `doc-expiry-${step}:${d._id}:${d.expiresAt!.toISOString().slice(0, 10)}`, email: true,
     });
     if (a) raised += 1;
   }
