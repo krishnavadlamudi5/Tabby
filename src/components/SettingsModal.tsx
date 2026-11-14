@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { SUPPORTED_CURRENCIES, formatAmount, getCurrencyConfig } from '../utils/currency';
 import { exportExpensesToCSV } from '../utils/export';
-import { X, Settings, DollarSign, User as UserIcon, RotateCcw, Check, Sparkles, Globe, Shield, Download } from 'lucide-react';
+import { X, Settings, DollarSign, User as UserIcon, RotateCcw, Check, Sparkles, Globe, Shield, Download, LogOut } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -17,6 +17,8 @@ interface SettingsModalProps {
   onCurrencyChange: (newCurrencyCode: string) => void;
   onUpdateProfile: (updatedUser: Partial<User>) => void;
   onResetData: () => void;
+  onSignOut: () => void;
+  isDemo?: boolean;
   expenses?: any[];
   groups?: any[];
   allUsers?: any[];
@@ -30,6 +32,8 @@ export default function SettingsModal({
   onCurrencyChange,
   onUpdateProfile,
   onResetData,
+  onSignOut,
+  isDemo = false,
   expenses = [],
   groups = [],
   allUsers = [],
@@ -51,10 +55,11 @@ export default function SettingsModal({
     }
 
     // Update profile
-    if (userName.trim() !== currentUser.name || userEmail.trim() !== currentUser.email) {
+    const emailChanged = isDemo && userEmail.trim() !== currentUser.email;
+    if (userName.trim() !== currentUser.name || emailChanged) {
       onUpdateProfile({
         name: userName.trim() || currentUser.name,
-        email: userEmail.trim() || currentUser.email,
+        ...(emailChanged ? { email: userEmail.trim() } : {}),
       });
     }
 
@@ -214,9 +219,11 @@ export default function SettingsModal({
                   type="email"
                   value={userEmail}
                   onChange={(e) => setUserEmail(e.target.value)}
-                  className="px-3 py-2 border border-[#E6E1DA] rounded-xl text-xs text-[#2C2B29] focus:outline-none focus:border-[#3C5A48] bg-white"
+                  readOnly={!isDemo}
+                  className={`px-3 py-2 border border-[#E6E1DA] rounded-xl text-xs text-[#2C2B29] focus:outline-none focus:border-[#3C5A48] ${isDemo ? 'bg-white' : 'bg-[#FAF8F5] text-[#736F6A]'}`}
                   required
                 />
+                {!isDemo && <span className="text-[10px] text-[#A39E98]">Comes from your Google account.</span>}
               </div>
             </div>
           </div>
@@ -233,8 +240,8 @@ export default function SettingsModal({
             {!showConfirmReset ? (
               <div className="p-3 bg-[#FDF3F0] border border-[#C86D51]/30 rounded-xl flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-bold text-[#2C2B29] block">Reset to Sample Demo Data</span>
-                  <span className="text-[11px] text-[#736F6A] block">Restores initial sample groups, friends & expenses.</span>
+                  <span className="text-xs font-bold text-[#2C2B29] block">{isDemo ? 'Reset Demo Data' : 'Reload From Server'}</span>
+                  <span className="text-[11px] text-[#736F6A] block">{isDemo ? 'Restores the sample groups, friends & expenses.' : 'Clears this device\'s copy and downloads your data again.'}</span>
                 </div>
                 <button
                   type="button"
@@ -247,8 +254,8 @@ export default function SettingsModal({
               </div>
             ) : (
               <div className="p-4 bg-[#FDF3F0] border border-[#C86D51] rounded-xl flex flex-col gap-3 animate-fadeIn">
-                <span className="text-xs font-bold text-[#C86D51]">Are you sure you want to reset all app data?</span>
-                <p className="text-[11px] text-[#736F6A]">This will restore default sample groups, friends, expenses and reset local storage.</p>
+                <span className="text-xs font-bold text-[#C86D51]">{isDemo ? 'Reset the demo data?' : 'Reload your data from the server?'}</span>
+                <p className="text-[11px] text-[#736F6A]">{isDemo ? 'This restores the default sample groups, friends and expenses.' : 'Nothing on the server is deleted. Changes still waiting to sync are kept and sent first.'}</p>
                 <div className="flex items-center gap-2 justify-end">
                   <button
                     type="button"
@@ -267,16 +274,41 @@ export default function SettingsModal({
                     className="px-3 py-1.5 bg-[#C86D51] hover:bg-[#A64B32] text-white font-bold text-xs rounded-xl cursor-pointer"
                     id="confirm-reset-data-btn"
                   >
-                    Yes, Reset Everything
+                    {isDemo ? 'Yes, Reset' : 'Yes, Reload'}
                   </button>
                 </div>
               </div>
             )}
           </div>
 
+          {/* SECTION 4: Account */}
+          <div className="flex flex-col gap-3" id="settings-section-account">
+            <label className="text-xs font-bold text-[#736F6A] uppercase tracking-wider flex items-center gap-1.5">
+              <LogOut className="w-3.5 h-3.5" />
+              Account
+            </label>
+            <div className="p-3 bg-[#FAF8F5] border border-[#E6E1DA] rounded-xl flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-[#2C2B29] block">{isDemo ? 'Leave demo mode' : 'Sign out'}</span>
+                <span className="text-[11px] text-[#736F6A] block truncate">
+                  {isDemo ? 'Go back to the sign-in screen.' : `Signed in as ${currentUser.email}`}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onSignOut}
+                className="px-3 py-1.5 bg-white border border-[#E6E1DA] text-[#2C2B29] hover:bg-[#2C2B29] hover:text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex-shrink-0 flex items-center gap-1.5"
+                id="sign-out-btn"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                {isDemo ? 'Exit demo' : 'Sign out'}
+              </button>
+            </div>
+          </div>
+
           {/* Footer Save Button */}
           <div className="pt-2 border-t border-[#E6E1DA] flex items-center justify-between" id="settings-footer">
-            <span className="text-[11px] text-[#736F6A]">Changes are saved locally</span>
+            <span className="text-[11px] text-[#736F6A]">{isDemo ? 'Demo: saved on this device only' : 'Changes sync to your account'}</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"

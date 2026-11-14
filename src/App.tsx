@@ -17,6 +17,8 @@ import Sidebar from './components/layout/Sidebar';
 import MobileHeader from './components/layout/MobileHeader';
 
 import ToastContainer from './components/ToastContainer';
+import Login from './components/Login';
+import SyncIndicator from './components/SyncIndicator';
 
 // Icons & UI
 import { Grid, Users, UserPlus, Bell, Plus, Sparkles, X, Download, RefreshCw } from 'lucide-react';
@@ -49,7 +51,9 @@ export default function App() {
     saveExpense,
     deleteExpense,
     settleDebt,
-    simulateAppUpdate
+    simulateAppUpdate,
+    authStatus,
+    signOut,
   } = useAppStore();
 
   // Navigation State
@@ -113,17 +117,17 @@ export default function App() {
     }
   }, []);
 
-  // MongoDB Data Sync
+  // Server sync (signed-in accounts only; demo mode never talks to the server)
   useEffect(() => {
-    if (!currentUser?.id) return;
-    syncWithBackend(currentUser.id);
+    if (authStatus !== 'signedIn' || !currentUser?.id) return;
+    syncWithBackend();
 
     const interval = setInterval(() => {
-      syncWithBackend(currentUser.id);
+      syncWithBackend();
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [currentUser?.id]);
+  }, [authStatus, currentUser?.id]);
 
   // Selectors
   const myGroups = useMemo(() => {
@@ -177,6 +181,15 @@ export default function App() {
     setSettleModal({ isOpen: true, fromUser, toUser, totalDebt: amount, groupId });
   };
 
+  if (authStatus === 'signedOut') {
+    return (
+      <>
+        <ToastContainer />
+        <Login />
+      </>
+    );
+  }
+
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#F8F5F2] flex items-center justify-center">
@@ -188,6 +201,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#F8F5F2] flex flex-col font-sans text-[#2C2B29] antialiased" id="splitwise-app-root">
       <ToastContainer />
+      <SyncIndicator />
       <AnimatePresence>
         {(showLiveBanner || (isAppUpdateAvailable && showAppUpdateBanner)) && (
           <motion.div 
@@ -466,6 +480,12 @@ export default function App() {
         onCurrencyChange={setCurrency}
         onUpdateProfile={updateProfile}
         onResetData={resetData}
+        onSignOut={() => {
+          setIsSettingsOpen(false);
+          setActiveView({ type: 'dashboard' });
+          signOut();
+        }}
+        isDemo={authStatus === 'demo'}
         expenses={myExpenses}
         groups={myGroups}
         allUsers={users}

@@ -44,7 +44,7 @@ export function createApp() {
   function isAllowedOrigin(origin: string): boolean {
     if (CAPACITOR_ORIGINS.has(origin)) return true;
     if (configuredOrigins.has(origin)) return true;
-    if (!isProduction && /^https?:\/\/localhost(:\d+)?$/.test(origin)) return true;
+    if (!isProduction && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
     return false;
   }
 
