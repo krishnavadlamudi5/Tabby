@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Grid, Bell, Settings, Search, X, Plus, UserPlus, Wallet } from 'lucide-react';
 import AppLogo from '../AppLogo';
+import { FINANCE_TABS } from '../../features/finance/FinanceApp';
 import { useAppStore } from '../../store/useAppStore';
 
 interface SidebarProps {
@@ -150,26 +151,17 @@ export default function Sidebar({
         </div>
 
         <div className="flex flex-col gap-1">
-          <span className="text-[10px] font-bold text-[#736F6A] uppercase tracking-wider px-3">Finance</span>
-          {([
-            ['home', 'Money overview'],
-            ['transactions', 'Transactions'],
-            ['reports', 'Reports (year)'],
-            ['review', 'Review queue'],
-            ['accounts', 'Accounts & statements'],
-            ['commitments', 'Commitments'],
-            ['insurance', 'Insurance'],
-            ['documents', 'Documents'],
-          ] as const).map(([tab, label]) => {
-            const isActive = activeView.type === 'finance' && activeView.tab === tab;
+          <span className="text-[10px] font-bold text-[#736F6A] uppercase tracking-wider px-3">Money</span>
+          {FINANCE_TABS.map((t) => {
+            const isActive = activeView.type === 'finance' && activeView.tab === t.id;
             return (
               <button
-                key={tab}
-                onClick={() => { setActiveView({ type: 'finance', tab }); setIsMobileMenuOpen(false); }}
+                key={t.id}
+                onClick={() => { setActiveView({ type: 'finance', tab: t.id }); setIsMobileMenuOpen(false); }}
                 className={`flex items-center gap-3 px-3 py-1.5 rounded-xl font-semibold text-xs transition-all cursor-pointer ${isActive ? 'bg-[#EBF1ED] text-[#3C5A48]' : 'text-[#736F6A] hover:bg-[#EBF1ED]/50 hover:text-[#2C2B29]'}`}
               >
-                {tab === 'home' ? <Wallet className="w-4 h-4" /> : <span className="w-4" />}
-                {label}
+                {t.icon}
+                {t.label}
               </button>
             );
           })}
