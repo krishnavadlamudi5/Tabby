@@ -10,6 +10,9 @@ export default defineConfig({
     env: {
       JWT_SECRET: 'test-secret-do-not-use-in-production',
       NODE_ENV: 'test',
+      // 32 zero bytes, base64 - test-only key
+      DATA_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      RATE_LIMIT_MAX: '100000',
     },
   },
 });

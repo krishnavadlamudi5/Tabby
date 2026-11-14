@@ -11,6 +11,7 @@ import expenseRoutes from './routes/expenses';
 import activityRoutes from './routes/activities';
 import syncRoutes from './routes/sync';
 import receiptRoutes from './routes/receipt';
+import financeRoutes from './finance/routes';
 
 // ---------------------------------------------------------------------------
 // CORS allowlist
@@ -105,6 +106,7 @@ export function createApp() {
   app.use('/api/activities', activityRoutes);
   app.use('/api/sync', syncRoutes);
   app.use('/api/receipt', receiptRoutes);
+  app.use('/api/finance', financeRoutes);
 
   // Anything else under /api is an unknown route - still JSON, never HTML.
   app.use('/api', (req, res) => {

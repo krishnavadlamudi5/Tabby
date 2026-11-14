@@ -5,6 +5,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { User } from '../models/User';
 import { signToken } from '../middleware/auth';
 import { DEMO_USERS_SEED } from '../seedDemo';
+import { ensureDefaultCategories } from '../finance/services/categories';
 
 const router = Router();
 
@@ -114,6 +115,13 @@ router.post('/google', googleLimiter, async (req: Request, res: Response): Promi
         changed = true;
       }
       if (changed) await user.save();
+    }
+
+    // Default finance categories on first sign-in. Never blocks login.
+    try {
+      await ensureDefaultCategories(user.id);
+    } catch (err) {
+      console.warn('Category seeding failed:', err);
     }
 
     const token = signToken(user.id, email);
