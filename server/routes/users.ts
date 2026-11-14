@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { User } from '../models/User';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { findVisibleUsers } from '../services/userVisibility';
 
 const router = Router();
 
@@ -20,20 +21,17 @@ function pickWhitelisted(body: any): Record<string, any> {
 // All routes below require a valid session.
 router.use(requireAuth);
 
-// GET /api/users?ids=id1,id2 - used to resolve names/avatars for friends and
-// group members. Read-only and deliberately not restricted to "my" ids
-// (any signed-in user can look up public profile fields for anyone they
-// already know the id of), but the password hash is never selected/returned.
+// GET /api/users?ids=id1,id2 - resolves names/avatars for the caller, their
+// friends, people who added them, and members of their groups. Nobody else is
+// ever returned, with or without ?ids=, and other users' phone numbers are
+// only included for the caller's own friends.
 router.get('/', async (req: AuthedRequest, res: Response): Promise<void> => {
   try {
-    const idsQuery = req.query.ids as string;
-    let users;
-    if (idsQuery) {
-      const ids = idsQuery.split(',').map(i => i.trim()).filter(Boolean);
-      users = await User.find({ id: { $in: ids } });
-    } else {
-      users = await User.find().limit(100);
-    }
+    const idsQuery = req.query.ids as string | undefined;
+    const ids = idsQuery
+      ? idsQuery.split(',').map((i) => i.trim()).filter(Boolean)
+      : undefined;
+    const users = await findVisibleUsers(req.userId as string, ids);
 
     res.json({ success: true, users });
   } catch (error: any) {
