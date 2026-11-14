@@ -7,6 +7,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
+export type UpdateCheckResult = 'available' | 'up-to-date' | 'error';
+
 export interface LiveUpdateState {
   isUpdateAvailable: boolean;
   isDownloading: boolean;
@@ -15,9 +17,11 @@ export interface LiveUpdateState {
   releaseNotes: string | null;
   downloadUrl: string | null;
   error: string | null;
+  /** Version of the bundle currently running ('builtin' = the one shipped inside the APK). */
+  currentVersion: string | null;
   showBanner: boolean;
   setShowBanner: (show: boolean) => void;
-  checkForUpdate: (isManualCheck?: boolean) => Promise<void>;
+  checkForUpdate: (isManualCheck?: boolean) => Promise<UpdateCheckResult>;
   applyUpdate: () => Promise<void>;
   dismissUpdate: () => void;
 }
@@ -96,10 +100,11 @@ export function useLiveUpdate(): LiveUpdateState {
   const [releaseNotes, setReleaseNotes] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [showBanner, setShowBanner] = useState<boolean>(false);
 
   // Check for updates
-  const checkForUpdate = useCallback(async (isManualCheck: boolean = false) => {
+  const checkForUpdate = useCallback(async (isManualCheck: boolean = false): Promise<UpdateCheckResult> => {
     try {
       setError(null);
 
@@ -124,14 +129,14 @@ export function useLiveUpdate(): LiveUpdateState {
       if (response.status === 304) {
         // Not modified - reuse the last release payload we cached alongside its ETag.
         const cached = localStorage.getItem(STORAGE_RELEASE_CACHE_KEY);
-        if (!cached) return; // nothing to compare against yet; wait for the next full fetch
+        if (!cached) return 'error'; // nothing to compare against yet; wait for the next full fetch
         release = JSON.parse(cached);
       } else if (!response.ok) {
         // If 404 (no releases yet) or rate-limited, skip silently unless manual check
         if (isManualCheck) {
           setError(response.status === 404 ? 'No updates found on GitHub yet.' : 'GitHub check limit reached. Please try later.');
         }
-        return;
+        return 'error';
       } else {
         release = await response.json();
         const newEtag = response.headers.get('ETag');
@@ -147,7 +152,7 @@ export function useLiveUpdate(): LiveUpdateState {
         if (isManualCheck) {
           setError('No dist.zip asset attached to the latest release.');
         }
-        return;
+        return 'error';
       }
 
       // Check current local version
@@ -165,6 +170,8 @@ export function useLiveUpdate(): LiveUpdateState {
         currentVersion = currentVersion.split('_cachebust_')[0];
       }
 
+      setCurrentVersion(currentVersion);
+
       // Check if this release was dismissed in this session
       const dismissedVersion = sessionStorage.getItem(STORAGE_DISMISSED_VERSION_KEY);
 
@@ -177,15 +184,17 @@ export function useLiveUpdate(): LiveUpdateState {
         if (!dismissedVersion || dismissedVersion !== remoteVersion || isManualCheck) {
           setShowBanner(true);
         }
-      } else {
-        setIsUpdateAvailable(false);
-        setShowBanner(false);
+        return 'available';
       }
+      setIsUpdateAvailable(false);
+      setShowBanner(false);
+      return 'up-to-date';
     } catch (err: any) {
       console.warn('Update check failed or offline:', err);
       if (isManualCheck) {
         setError('Network error while checking for updates.');
       }
+      return 'error';
     }
   }, []);
 
@@ -312,6 +321,7 @@ export function useLiveUpdate(): LiveUpdateState {
     releaseNotes,
     downloadUrl,
     error,
+    currentVersion,
     showBanner,
     setShowBanner,
     checkForUpdate,

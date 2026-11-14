@@ -73,6 +73,8 @@ export default function App() {
     latestVersion: liveLatestVersion,
     releaseNotes: liveReleaseNotes,
     error: liveUpdateError,
+    currentVersion: liveCurrentVersion,
+    checkForUpdate: checkForLiveUpdate,
     showBanner: showLiveBanner,
     applyUpdate: applyLiveUpdate,
     dismissUpdate: dismissLiveUpdate,
@@ -469,6 +471,12 @@ export default function App() {
         expenses={myExpenses}
         groups={myGroups}
         allUsers={users}
+        appVersion={liveCurrentVersion}
+        latestAppVersion={liveLatestVersion}
+        isAppUpdateAvailable={isLiveUpdateAvailable}
+        isDownloadingAppUpdate={isLiveDownloading}
+        onCheckForAppUpdate={checkForLiveUpdate}
+        onApplyAppUpdate={applyLiveUpdate}
       />
 
       <SettleUpModal

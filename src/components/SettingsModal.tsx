@@ -7,7 +7,8 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { SUPPORTED_CURRENCIES, formatAmount, getCurrencyConfig } from '../utils/currency';
 import { exportExpensesToCSV } from '../utils/export';
-import { X, Settings, DollarSign, User as UserIcon, RotateCcw, Check, Sparkles, Globe, Shield, Download } from 'lucide-react';
+import { X, Settings, DollarSign, User as UserIcon, RotateCcw, Check, Sparkles, Globe, Shield, Download, RefreshCw } from 'lucide-react';
+import type { UpdateCheckResult } from '../hooks/useLiveUpdate';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -20,6 +21,12 @@ interface SettingsModalProps {
   expenses?: any[];
   groups?: any[];
   allUsers?: any[];
+  appVersion?: string | null;
+  latestAppVersion?: string | null;
+  isAppUpdateAvailable?: boolean;
+  isDownloadingAppUpdate?: boolean;
+  onCheckForAppUpdate?: (isManualCheck?: boolean) => Promise<UpdateCheckResult>;
+  onApplyAppUpdate?: () => void;
 }
 
 export default function SettingsModal({
@@ -33,12 +40,20 @@ export default function SettingsModal({
   expenses = [],
   groups = [],
   allUsers = [],
+  appVersion = null,
+  latestAppVersion = null,
+  isAppUpdateAvailable = false,
+  isDownloadingAppUpdate = false,
+  onCheckForAppUpdate,
+  onApplyAppUpdate,
 }: SettingsModalProps) {
   const [selectedCurrency, setSelectedCurrency] = useState(currency);
   const [userName, setUserName] = useState(currentUser.name);
   const [userEmail, setUserEmail] = useState(currentUser.email);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateCheckResult, setUpdateCheckResult] = useState<UpdateCheckResult | null>(null);
 
   if (!isOpen) return null;
 
@@ -173,6 +188,67 @@ export default function SettingsModal({
           </div>
 
           <div className="border-t border-[#E6E1DA]" />
+
+          {/* SECTION 1.75: App Updates */}
+          {onCheckForAppUpdate && (
+            <>
+              <div className="flex flex-col gap-3" id="settings-section-updates">
+                <label className="text-xs font-bold text-[#2C2B29] uppercase tracking-wider flex items-center gap-1.5">
+                  <RefreshCw className="w-3.5 h-3.5 text-[#3C5A48]" />
+                  App Updates
+                </label>
+                <p className="text-xs text-[#736F6A]">
+                  Installed version:{' '}
+                  <span className="font-bold text-[#2C2B29]">
+                    {!appVersion || appVersion === 'builtin' || appVersion === '0.0.0' ? 'Original install' : appVersion}
+                  </span>
+                </p>
+                {isAppUpdateAvailable && latestAppVersion ? (
+                  <button
+                    type="button"
+                    disabled={isDownloadingAppUpdate}
+                    onClick={() => onApplyAppUpdate?.()}
+                    className="px-4 py-2 bg-[#3C5A48] hover:bg-[#2E4637] disabled:opacity-60 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
+                    id="settings-apply-update-btn"
+                  >
+                    <Download className="w-4 h-4" />
+                    {isDownloadingAppUpdate ? 'Downloading…' : `Install ${latestAppVersion}`}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isCheckingUpdate}
+                    onClick={async () => {
+                      setIsCheckingUpdate(true);
+                      setUpdateCheckResult(null);
+                      try {
+                        setUpdateCheckResult(await onCheckForAppUpdate(true));
+                      } finally {
+                        setIsCheckingUpdate(false);
+                      }
+                    }}
+                    className="px-4 py-2 bg-white border border-[#E6E1DA] hover:bg-[#FAF8F5] disabled:opacity-60 text-[#2C2B29] font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
+                    id="settings-check-update-btn"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+                    {isCheckingUpdate ? 'Checking…' : 'Check for Updates'}
+                  </button>
+                )}
+                {updateCheckResult === 'up-to-date' && (
+                  <span className="text-[11px] text-[#3C5A48] flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" /> You're on the latest version.
+                  </span>
+                )}
+                {updateCheckResult === 'error' && (
+                  <span className="text-[11px] text-[#C86D51]">
+                    Couldn't check for updates. Check your connection and try again.
+                  </span>
+                )}
+              </div>
+
+              <div className="border-t border-[#E6E1DA]" />
+            </>
+          )}
 
           {/* SECTION 2: Profile Settings */}
           <div className="flex flex-col gap-3" id="settings-section-profile">
