@@ -9,6 +9,18 @@ import { SUPPORTED_CURRENCIES, formatAmount, getCurrencyConfig } from '../utils/
 import { exportExpensesToCSV } from '../utils/export';
 import { X, Settings, DollarSign, User as UserIcon, RotateCcw, Check, Sparkles, Globe, Shield, Download, RefreshCw } from 'lucide-react';
 import { BUILD_INFO, type UpdateCheckResult } from '../hooks/useLiveUpdate';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
+
+const RELEASES_URL = 'https://github.com/krishnavadlamudi5/Tabby/releases';
+
+function openReleaseHistory() {
+  if (Capacitor.isNativePlatform()) {
+    Browser.open({ url: RELEASES_URL }).catch(() => window.open(RELEASES_URL, '_blank'));
+  } else {
+    window.open(RELEASES_URL, '_blank', 'noopener');
+  }
+}
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -256,6 +268,14 @@ export default function SettingsModal({
                     <Check className="w-3.5 h-3.5" /> You're on the latest version.
                   </span>
                 )}
+                <button
+                  type="button"
+                  onClick={openReleaseHistory}
+                  className="text-[11px] font-bold text-[#3C5A48] underline underline-offset-2 self-start"
+                  id="settings-view-versions-btn"
+                >
+                  View all versions & what changed
+                </button>
                 {updateCheckResult === 'error' && (
                   <span className="text-[11px] text-[#C86D51]">
                     Couldn't check for updates. Check your connection and try again.
