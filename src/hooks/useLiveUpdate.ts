@@ -7,6 +7,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
+export type UpdateCheckResult = 'available' | 'up-to-date' | 'error';
+
 export interface LiveUpdateState {
   isUpdateAvailable: boolean;
   isDownloading: boolean;
@@ -15,9 +17,11 @@ export interface LiveUpdateState {
   releaseNotes: string | null;
   downloadUrl: string | null;
   error: string | null;
+  /** Version of the bundle currently running ('builtin' = the one shipped inside the APK). */
+  currentVersion: string | null;
   showBanner: boolean;
   setShowBanner: (show: boolean) => void;
-  checkForUpdate: (isManualCheck?: boolean) => Promise<void>;
+  checkForUpdate: (isManualCheck?: boolean) => Promise<UpdateCheckResult>;
   applyUpdate: () => Promise<void>;
   dismissUpdate: () => void;
 }
@@ -27,6 +31,39 @@ const STORAGE_CURRENT_VERSION_KEY = 'tabby_app_active_version';
 const STORAGE_DISMISSED_VERSION_KEY = 'tabby_dismissed_update_version';
 const STORAGE_RELEASE_ETAG_KEY = 'tabby_gh_release_etag';
 const STORAGE_RELEASE_CACHE_KEY = 'tabby_gh_release_cache';
+
+/** "v1.1.57_cachebust_123" -> "1.1.57" */
+function normalizeVersion(v: string | null | undefined): string {
+  return (v || '').trim().replace(/^v/i, '').split('_cachebust_')[0];
+}
+
+function parseVersion(v: string): number[] | null {
+  return /^\d+(\.\d+)*$/.test(v) ? v.split('.').map(Number) : null;
+}
+
+/** True when `remote` is strictly newer than `current`. An unknown current version always loses. */
+function isNewerVersion(remote: string, current: string): boolean {
+  const r = parseVersion(remote);
+  if (!r) return false;
+  const c = parseVersion(current);
+  if (!c) return true;
+  for (let i = 0; i < Math.max(r.length, c.length); i++) {
+    const diff = (r[i] ?? 0) - (c[i] ?? 0);
+    if (diff !== 0) return diff > 0;
+  }
+  return false;
+}
+
+/**
+ * Version/commit/date baked into this exact JS bundle at build time by CI.
+ * Because it travels inside the bundle, it is correct both for the code that
+ * shipped inside the APK and for any OTA bundle applied later.
+ */
+export const BUILD_INFO = {
+  version: normalizeVersion(import.meta.env.VITE_APP_VERSION) || null,
+  commit: import.meta.env.VITE_APP_COMMIT || null,
+  buildDate: import.meta.env.VITE_APP_BUILD_DATE || null,
+};
 
 /**
  * Resolves any HTTP 301/302 redirects to obtain the direct asset URL (e.g. AWS/Azure CDN link from GitHub Release).
@@ -96,10 +133,11 @@ export function useLiveUpdate(): LiveUpdateState {
   const [releaseNotes, setReleaseNotes] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentVersion, setCurrentVersion] = useState<string | null>(null);
   const [showBanner, setShowBanner] = useState<boolean>(false);
 
   // Check for updates
-  const checkForUpdate = useCallback(async (isManualCheck: boolean = false) => {
+  const checkForUpdate = useCallback(async (isManualCheck: boolean = false): Promise<UpdateCheckResult> => {
     try {
       setError(null);
 
@@ -124,14 +162,14 @@ export function useLiveUpdate(): LiveUpdateState {
       if (response.status === 304) {
         // Not modified - reuse the last release payload we cached alongside its ETag.
         const cached = localStorage.getItem(STORAGE_RELEASE_CACHE_KEY);
-        if (!cached) return; // nothing to compare against yet; wait for the next full fetch
+        if (!cached) return 'error'; // nothing to compare against yet; wait for the next full fetch
         release = JSON.parse(cached);
       } else if (!response.ok) {
         // If 404 (no releases yet) or rate-limited, skip silently unless manual check
         if (isManualCheck) {
           setError(response.status === 404 ? 'No updates found on GitHub yet.' : 'GitHub check limit reached. Please try later.');
         }
-        return;
+        return 'error';
       } else {
         release = await response.json();
         const newEtag = response.headers.get('ETag');
@@ -140,35 +178,39 @@ export function useLiveUpdate(): LiveUpdateState {
           localStorage.setItem(STORAGE_RELEASE_CACHE_KEY, JSON.stringify(release));
         }
       }
-      const remoteVersion = release.tag_name || release.name;
+      const remoteVersion = normalizeVersion(release.tag_name || release.name);
       const zipAsset = release.assets?.find((asset: { name: string; browser_download_url: string }) => asset.name === 'dist.zip');
 
       if (!remoteVersion || !zipAsset) {
         if (isManualCheck) {
           setError('No dist.zip asset attached to the latest release.');
         }
-        return;
+        return 'error';
       }
 
-      // Check current local version
+      // Check current local version: prefer the version baked into this bundle.
       let currentVersion = '0.0.0';
-      if (Capacitor.isNativePlatform()) {
+      if (BUILD_INFO.version) {
+        currentVersion = BUILD_INFO.version;
+      } else if (Capacitor.isNativePlatform()) {
         try {
           const current = await CapacitorUpdater.current();
           currentVersion = current?.bundle?.version || '0.0.0';
-          currentVersion = currentVersion.split('_cachebust_')[0];
+          currentVersion = normalizeVersion(currentVersion);
         } catch (e) {
           console.warn('Could not determine native bundle version:', e);
         }
       } else {
         currentVersion = localStorage.getItem(STORAGE_CURRENT_VERSION_KEY) || '0.0.0';
-        currentVersion = currentVersion.split('_cachebust_')[0];
+        currentVersion = normalizeVersion(currentVersion);
       }
+
+      setCurrentVersion(currentVersion);
 
       // Check if this release was dismissed in this session
       const dismissedVersion = sessionStorage.getItem(STORAGE_DISMISSED_VERSION_KEY);
 
-      if (remoteVersion !== currentVersion) {
+      if (isNewerVersion(remoteVersion, currentVersion)) {
         setLatestVersion(remoteVersion);
         setDownloadUrl(zipAsset.browser_download_url);
         setReleaseNotes(release.body || 'New enhancements and bug fixes.');
@@ -177,15 +219,17 @@ export function useLiveUpdate(): LiveUpdateState {
         if (!dismissedVersion || dismissedVersion !== remoteVersion || isManualCheck) {
           setShowBanner(true);
         }
-      } else {
-        setIsUpdateAvailable(false);
-        setShowBanner(false);
+        return 'available';
       }
+      setIsUpdateAvailable(false);
+      setShowBanner(false);
+      return 'up-to-date';
     } catch (err: any) {
       console.warn('Update check failed or offline:', err);
       if (isManualCheck) {
         setError('Network error while checking for updates.');
       }
+      return 'error';
     }
   }, []);
 
@@ -312,6 +356,7 @@ export function useLiveUpdate(): LiveUpdateState {
     releaseNotes,
     downloadUrl,
     error,
+    currentVersion,
     showBanner,
     setShowBanner,
     checkForUpdate,

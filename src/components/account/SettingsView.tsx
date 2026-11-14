@@ -9,7 +9,8 @@ import { useToastStore } from '../../store/useToastStore';
 import { logoutAllApi, AlertChannel } from '../../lib/api';
 import { SUPPORTED_CURRENCIES, paiseToInput, rupeesToPaise } from '../../utils/currency';
 import { exportExpensesToCSV } from '../../utils/export';
-import { APK_DOWNLOAD_URL, currentAppVersion } from '../../lib/appVersion';
+import { APK_DOWNLOAD_URL, RELEASES_URL, currentAppVersion } from '../../lib/appVersion';
+import { BUILD_INFO, type UpdateCheckResult } from '../../hooks/useLiveUpdate';
 import { financeApi, saveBlob } from '../../features/finance/api';
 import { openExternal } from '../../features/finance/insurers';
 import { Badge, Button, Card, Field, Select, TextInput, fmtDate, useAsync } from '../../features/finance/components/ui';
@@ -41,7 +42,7 @@ export default function SettingsView({ section, onBack, onNavigateFinance, liveU
   section?: SettingsSection;
   onBack: () => void;
   onNavigateFinance: (tab: FinanceTab) => void;
-  liveUpdate: { checkForUpdate: (manual?: boolean) => Promise<void>; isUpdateAvailable: boolean; latestVersion: string | null; applyUpdate: () => void; isDownloading: boolean };
+  liveUpdate: LiveUpdateProps;
 }) {
   const { currentUser, authStatus, currency, setCurrency, updateProfile, signOut, resetData, expenses, groups, users } = useAppStore();
   const { prefs, save, load } = usePrefsStore();
@@ -241,19 +242,43 @@ export default function SettingsView({ section, onBack, onNavigateFinance, liveU
   }
 }
 
-function AboutSection({ liveUpdate }: { liveUpdate: { checkForUpdate: (manual?: boolean) => Promise<void>; isUpdateAvailable: boolean; latestVersion: string | null; applyUpdate: () => void; isDownloading: boolean } }) {
+type LiveUpdateProps = {
+  checkForUpdate: (manual?: boolean) => Promise<UpdateCheckResult>;
+  isUpdateAvailable: boolean;
+  latestVersion: string | null;
+  currentVersion?: string | null;
+  applyUpdate: () => void;
+  isDownloading: boolean;
+};
+
+function AboutSection({ liveUpdate }: { liveUpdate: LiveUpdateProps }) {
   const [version, setVersion] = useState('');
   const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<UpdateCheckResult | null>(null);
   useEffect(() => { void currentAppVersion().then(setVersion); }, []);
   return (
-    <Section id="about" title="About" icon={<Info className="w-4 h-4" />}>
-      <Row title="Tabby" text={`Version ${version}${liveUpdate.isUpdateAvailable && liveUpdate.latestVersion ? ` · ${liveUpdate.latestVersion} available` : ''}`}>
-        {liveUpdate.isUpdateAvailable
-          ? <Button size="sm" busy={liveUpdate.isDownloading} onClick={liveUpdate.applyUpdate}>Update now</Button>
-          : <Button size="sm" variant="secondary" busy={checking} onClick={async () => { setChecking(true); try { await liveUpdate.checkForUpdate(true); } finally { setChecking(false); } }}><RefreshCw className="w-3.5 h-3.5" /> Check</Button>}
+    <Section id="about" title="About & app updates" icon={<Info className="w-4 h-4" />}>
+      <div className="p-3 bg-[#FAF8F5] border border-[#E6E1DA] rounded-xl flex flex-col gap-1 text-xs text-[#736F6A]">
+        <div className="flex justify-between gap-2"><span>Installed version</span><b className="text-[#2C2B29]" id="settings-installed-version">{version}</b></div>
+        {BUILD_INFO.commit && <div className="flex justify-between gap-2"><span>Commit</span><span className="font-mono text-[#2C2B29]">{BUILD_INFO.commit.slice(0, 7)}</span></div>}
+        {BUILD_INFO.buildDate && <div className="flex justify-between gap-2"><span>Built</span><span className="text-[#2C2B29]">{fmtDate(BUILD_INFO.buildDate, true)}</span></div>}
+      </div>
+      {liveUpdate.isUpdateAvailable && liveUpdate.latestVersion ? (
+        <Button busy={liveUpdate.isDownloading} onClick={liveUpdate.applyUpdate}><Download className="w-3.5 h-3.5" /> Install v{liveUpdate.latestVersion}</Button>
+      ) : (
+        <Button variant="secondary" busy={checking} onClick={async () => {
+          setChecking(true);
+          setResult(null);
+          try { setResult(await liveUpdate.checkForUpdate(true)); } finally { setChecking(false); }
+        }}><RefreshCw className="w-3.5 h-3.5" /> Check for updates</Button>
+      )}
+      {result === 'up-to-date' && <span className="text-[11px] text-[#3C5A48]">You're on the latest version.</span>}
+      {result === 'error' && <span className="text-[11px] text-[#C86D51]">Couldn't check for updates. Check your connection and try again.</span>}
+      <Row title="All versions & what changed" text="Every build is a release with its notes">
+        <Button size="sm" variant="secondary" onClick={() => openExternal(RELEASES_URL)}><ExternalLink className="w-3.5 h-3.5" /> Releases</Button>
       </Row>
-      <Row title="Android app (APK)" text="App updates arrive inside the app. A new APK is only needed for new app icons or phone features.">
-        <Button size="sm" variant="secondary" onClick={() => openExternal(APK_DOWNLOAD_URL)}><ExternalLink className="w-3.5 h-3.5" /> Builds</Button>
+      <Row title="Android app (APK)" text="Updates arrive inside the app. A new APK is only needed for new app icons or phone features.">
+        <Button size="sm" variant="secondary" onClick={() => openExternal(APK_DOWNLOAD_URL)}><ExternalLink className="w-3.5 h-3.5" /> APK builds</Button>
       </Row>
     </Section>
   );

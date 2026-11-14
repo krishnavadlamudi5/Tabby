@@ -58,7 +58,7 @@ export default function ProfileMenu({ open, onClose, onOpenSettings, onCheckUpda
         {item(<Settings className="w-4 h-4 text-[#736F6A]" />, 'Settings', () => onOpenSettings())}
         {!demo && item(<Wallet className="w-4 h-4 text-[#736F6A]" />, 'Money settings', () => onOpenSettings('money'))}
         {!demo && item(<Bell className="w-4 h-4 text-[#736F6A]" />, 'Alerts & emails', () => onOpenSettings('notifications'))}
-        {item(<RefreshCw className="w-4 h-4 text-[#736F6A]" />, 'Check for updates', onCheckUpdates, <span className="text-[10px] text-[#A39E98]">{version}</span>)}
+        {item(<RefreshCw className="w-4 h-4 text-[#736F6A]" />, 'App updates', onCheckUpdates, <span className="text-[10px] text-[#A39E98]">{version}</span>)}
         <div className="border-t border-[#F2EFEA] mt-1 pt-1">
           {demo
             ? item(<LogIn className="w-4 h-4" />, 'Sign in with Google', signOut)

@@ -85,10 +85,11 @@ export default function App() {
     latestVersion: liveLatestVersion,
     releaseNotes: liveReleaseNotes,
     error: liveUpdateError,
+    currentVersion: liveCurrentVersion,
+    checkForUpdate: checkForLiveUpdate,
     showBanner: showLiveBanner,
     applyUpdate: applyLiveUpdate,
     dismissUpdate: dismissLiveUpdate,
-    checkForUpdate: checkLiveUpdate,
   } = useLiveUpdate();
 
   // Modal States
@@ -249,7 +250,7 @@ export default function App() {
                 <span className="font-extrabold text-white text-[13px] sm:text-sm truncate drop-shadow-sm">
                   {isLiveDownloading
                     ? `Downloading Update... (${liveDownloadProgress}%)`
-                    : (liveUpdateError ? 'Update Failed' : `Update ${liveLatestVersion || ''} Available!`)}
+                    : (liveUpdateError ? 'Update Failed' : `Update ${liveLatestVersion ? `v${liveLatestVersion}` : ''} Available!`)}
                 </span>
                 <span className="text-[11px] sm:text-xs text-emerald-100/90 truncate font-medium">
                   {isLiveDownloading
@@ -386,7 +387,7 @@ export default function App() {
                 section={activeView.section}
                 onBack={() => setActiveView({ type: 'dashboard' })}
                 onNavigateFinance={(tab) => setActiveView({ type: 'finance', tab })}
-                liveUpdate={{ checkForUpdate: checkLiveUpdate, isUpdateAvailable: isLiveUpdateAvailable, latestVersion: liveLatestVersion, applyUpdate: applyLiveUpdate, isDownloading: isLiveDownloading }}
+                liveUpdate={{ checkForUpdate: checkForLiveUpdate, isUpdateAvailable: isLiveUpdateAvailable, latestVersion: liveLatestVersion, currentVersion: liveCurrentVersion, applyUpdate: applyLiveUpdate, isDownloading: isLiveDownloading }}
               />
             )}
 
@@ -528,7 +529,7 @@ export default function App() {
         align={profileMenu || 'right'}
         onClose={() => setProfileMenu(null)}
         onOpenSettings={openSettings}
-        onCheckUpdates={() => { void checkLiveUpdate(true); }}
+        onCheckUpdates={() => openSettings('about')}
       />
 
       <SettleUpModal

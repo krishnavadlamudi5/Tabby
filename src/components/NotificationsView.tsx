@@ -280,7 +280,7 @@ export default function NotificationsView({
                         <div className="mt-3 p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-100 rounded-xl flex items-center justify-between shadow-inner">
                           <div className="flex items-center gap-2 text-xs text-amber-900 font-bold">
                             <RefreshCw className={`w-4 h-4 ${isDownloadingUpdate ? 'animate-spin' : 'animate-spin-slow'}`} />
-                            {liveLatestVersion ? `Tabby ${liveLatestVersion} Available` : 'Tabby System Update'}
+                            {liveLatestVersion ? `Tabby v${liveLatestVersion} Available` : 'Tabby System Update'}
                           </div>
                           <button
                             type="button"
