@@ -186,8 +186,19 @@ export const policyCreate = z.object({
   tpa: shortText.default(''),
   taxSection: z.enum(['80C', '80D']).nullable().default(null),
   notes: longText.default(''),
+  vehicleNumber: z.string().trim().max(20).default(''),
+  needsCheck: z.boolean().optional(),
+  /** Review item this policy was created from: its attachments get linked and it is marked done. */
+  fromRawEventId: objectId.optional(),
 });
 export const policyUpdate = policyCreate.partial();
+export const policyExtractBody = z.object({
+  text: z.string().max(200_000).optional(),
+  sender: z.string().max(300).default(''),
+  subject: z.string().max(500).default(''),
+  rawEventId: objectId.optional(),
+}).refine((b) => b.text || b.rawEventId, 'send text or rawEventId');
+export const docPasswordCreate = z.object({ label: shortText.min(1), password: z.string().min(1).max(100) });
 export const personCreate = z.object({
   name: shortText.min(1),
   relation: shortText.default('self'),

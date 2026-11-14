@@ -26,6 +26,22 @@ by exact parsers, anything else waits in the review queue.
 Code lives in `server/finance/` and `src/features/finance/`. Money is stored
 as integer paise; dates are UTC, business days are India time.
 
+### Insurance, automatically
+
+When an insurer (or PolicyBazaar, Ditto…) emails you a policy, the Gmail
+script delivers it and Tabby files it on its own: insurer, policy number,
+vehicle number, cover, premium, dates and nominee are read from the email and
+the policy PDF, the PDF is attached, renewal reminders are scheduled and the
+premium payment is linked (also when paid through Acko/Razorpay/PolicyBazaar).
+Renewals update the same policy. It is marked "Auto-added · tap to check".
+
+- Reading uses the labels on Indian policy schedules (no AI). Optional backup:
+  Cloudflare Workers AI (`CF_ACCOUNT_ID`, `CF_AI_TOKEN`), masked text only.
+- Locked PDFs: save the password once under Insurance → PDF passwords.
+- Scanned PDFs and photos are read **on your phone** (pdf.js + Tesseract OCR,
+  free; the OCR engine downloads from cdn.jsdelivr.net the first time).
+  Use Insurance → "Add from document", or "Scan & add policy" in Review.
+
 ### One-time setup
 
 1. **Render:** set `DATA_ENCRYPTION_KEY` (back it up offline), `INGEST_HMAC_SECRET`,

@@ -19,18 +19,31 @@ function insurerWords(insurer: string): string[] {
  * insurer and whose amount is within ±1% of the premium. Also files them
  * under the Insurance category. Returns the linked transaction ids.
  */
-export async function linkPremiums(ownerId: string, policy: IPolicy): Promise<Types.ObjectId[]> {
+const PAYMENT_VIA = /policybazaar|acko|digit|insurancedekho|ditto|coverfox|turtlemint|renewbuy|razorpay|payu|billdesk|ccavenue|paytm|phonepe|cashfree|insurance|general|lombard|ergo|assurance/;
+
+/**
+ * Links premium payments to a policy:
+ *  - a debit whose merchant mentions the insurer, amount within ±1% of the
+ *    premium (any date), or
+ *  - when bought through a website/gateway (Acko, PolicyBazaar, Razorpay…):
+ *    the same amount (±₹1) within 3 days of the policy start / email.
+ * Files them under Insurance. Returns the linked transaction ids.
+ */
+export async function linkPremiums(ownerId: string, policy: IPolicy, aroundDate?: Date): Promise<Types.ObjectId[]> {
   if (!policy.premiumPaise) return [];
   const words = insurerWords(policy.insurer);
-  if (!words.length) return [];
   const tol = Math.max(100, Math.round(policy.premiumPaise * 0.01));
   const candidates = await Transaction.find({
     ownerId, direction: 'debit', status: 'settled',
     amountPaise: { $gte: policy.premiumPaise - tol, $lte: policy.premiumPaise + tol },
   });
+  const anchors = [aroundDate, policy.startDate].filter((d): d is Date => Boolean(d));
   const hits = candidates.filter((t) => {
     const m = `${normaliseMerchant(t.merchant)} ${normaliseMerchant(t.merchantRaw)} ${normaliseMerchant(t.description)}`;
-    return words.some((w) => m.includes(w));
+    if (words.some((w) => m.includes(w))) return true;
+    const near = anchors.some((a) => Math.abs(t.postedAt.getTime() - a.getTime()) <= 3 * 86_400_000);
+    const exact = Math.abs(t.amountPaise - policy.premiumPaise) <= 100;
+    return near && exact && (PAYMENT_VIA.test(m) || !m.trim());
   });
   if (!hits.length) return [];
   const ids = hits.map((h) => h._id);

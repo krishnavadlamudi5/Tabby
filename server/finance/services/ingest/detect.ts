@@ -19,7 +19,7 @@ export function detectType(sender: string, subject: string, text: string): Event
 
   if (/declined|failed transaction/i.test(subject)) return 'declined';
   if (/statement/i.test(subject) && !transactional) return 'statement';
-  if (/\b(policy|renewal|premium)\b/i.test(subject)) return 'policy';
+  if (/\b(policy|renewal|premium|insurance|insured)\b/i.test(subject)) return 'policy';
   if (/installment|emi\b/i.test(subject)) return 'emi_due';
   if (/\bsip\b|order report/i.test(subject)) return 'sip_report';
   if (/subscription|renew(s|al)? (on|soon)|confirm your .*payment/i.test(subject)) return 'subscription';

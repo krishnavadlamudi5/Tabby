@@ -11,6 +11,7 @@ import { saveDocument } from '../services/storage/documents';
 import { parsePdfStatement, StatementParseError } from '../services/statements/parse';
 import { importStatement } from '../services/statements/importStatement';
 import { raiseAlert } from '../services/alerts';
+import { filePolicy } from '../services/insurance/filePolicy';
 
 // ---------------------------------------------------------------- manual (signed-in user)
 
@@ -24,7 +25,17 @@ manualIngestRouter.post('/', handler(async (req, res) => {
     ...scoped(req), source: 'manual', sourceId: sha256(`${body.sender}|${body.subject}|${body.text}`),
     sender: body.sender || 'manual@paste', subject: body.subject, receivedAt: body.receivedAt || new Date(), bodyText: body.text,
   });
-  res.status(result.duplicate ? 409 : 200).json({ success: !result.duplicate, ...result, ...(result.duplicate ? { error: 'already_ingested' } : {}) });
+  let policy = null;
+  if (!result.duplicate && result.detectedType === 'policy') {
+    const filed = await filePolicy(req.userId!, result.rawEventId, {
+      sender: body.sender, subject: body.subject, bodyText: body.text, receivedAt: body.receivedAt || new Date(), pdfs: [],
+    });
+    policy = filed.policy;
+  }
+  res.status(result.duplicate ? 409 : 200).json({
+    success: !result.duplicate, ...result, ...(policy ? { status: 'parsed', policyId: String(policy._id) } : {}),
+    ...(result.duplicate ? { error: 'already_ingested' } : {}),
+  });
 }));
 
 // ---------------------------------------------------------------- Gmail push (HMAC)
@@ -101,6 +112,7 @@ emailIngestRouter.post('/', async (req: Request, res: Response) => {
     // Attachments go straight to encrypted storage as documents.
     const attachmentsMeta: { filename: string; mimeType: string; size: number; documentId?: string }[] = [];
     const statementPdfs: { buffer: Buffer; filename: string; docId: string }[] = [];
+    const otherPdfs: { buffer: Buffer; documentId: string; type: string }[] = [];
     for (const att of body.attachments) {
       const buffer = Buffer.from(att.base64, 'base64');
       try {
@@ -110,6 +122,7 @@ emailIngestRouter.post('/', async (req: Request, res: Response) => {
         });
         attachmentsMeta.push({ filename: att.filename, mimeType: att.mimeType, size: buffer.length, documentId: String(doc._id) });
         if (type === 'statement' && att.mimeType === 'application/pdf') statementPdfs.push({ buffer, filename: att.filename, docId: String(doc._id) });
+        else if (att.mimeType === 'application/pdf') otherPdfs.push({ buffer, documentId: String(doc._id), type });
       } catch (err: any) {
         attachmentsMeta.push({ filename: att.filename, mimeType: att.mimeType, size: buffer.length });
         console.warn('Attachment not stored:', err?.message);
@@ -121,6 +134,17 @@ emailIngestRouter.post('/', async (req: Request, res: Response) => {
       receivedAt: body.date || new Date(), bodyText: body.bodyText, attachmentsMeta,
     });
     if (result.duplicate) { res.status(409).json({ error: 'already_ingested' }); return; }
+
+    // Insurance emails: file the policy automatically (with its PDF).
+    let policy: { id: string; created: boolean } | null = null;
+    const policyPdfs = otherPdfs.filter((p) => p.type === 'policy' || result.detectedType === 'policy');
+    if (result.detectedType === 'policy' || policyPdfs.length) {
+      const filed = await filePolicy(ownerId, result.rawEventId, {
+        sender: body.from, subject: body.subject, bodyText: body.bodyText, receivedAt: body.date || new Date(),
+        pdfs: policyPdfs.map((p) => ({ buffer: p.buffer, documentId: p.documentId })),
+      });
+      if (filed.policy) policy = { id: String(filed.policy._id), created: filed.created };
+    }
 
     const statements: any[] = [];
     for (const pdf of statementPdfs) {
@@ -145,7 +169,7 @@ emailIngestRouter.post('/', async (req: Request, res: Response) => {
         }
       }
     }
-    res.json({ success: true, ...result, statements });
+    res.json({ success: true, ...result, ...(policy ? { status: 'parsed', reviewReason: undefined, policy } : {}), statements });
   } catch (err: any) {
     console.error('Email ingest failed:', err);
     res.status(500).json({ error: 'Ingest failed' });

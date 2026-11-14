@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Download, FileText, HeartPulse, Link2, Plus, Shield, Trash2, Upload, UserPlus } from 'lucide-react';
+import { Bike, Car, CheckCircle2, Download, FileSearch, FileText, HeartPulse, KeyRound, Link2, Loader2, Plus, Shield, Sparkles, Trash2, Upload, UserPlus } from 'lucide-react';
 import { financeApi, saveBlob } from '../api';
 import { Badge, Button, Card, Empty, ErrorBlock, Field, Money, SectionTitle, Select, Sheet, Spinner, TextArea, TextInput, fmtDate, toDateInput, toastError, toastOk, useAsync } from '../components/ui';
 import { formatPaise, paiseToInput, rupeesToPaise } from '../../../utils/currency';
-import type { Claim, Person, Policy, PolicyType } from '../types';
+import type { Claim, Person, Policy, PolicyExtraction, PolicyType } from '../types';
+import { documentToText } from '../ocr';
 
 const TYPE_LABEL: Record<PolicyType, string> = {
   health: 'Health', term_life: 'Term life', life: 'Life', vehicle: 'Vehicle', home: 'Home', travel: 'Travel', personal_accident: 'Personal accident', other: 'Other',
@@ -28,6 +29,29 @@ export default function Insurance() {
   const tax = useAsync(() => financeApi.tax(), []);
   const [openId, setOpenId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Policy | 'new' | null>(null);
+  const [draft, setDraft] = useState<{ prefill: Partial<Policy>; file?: File; note?: string } | null>(null);
+  const [reading, setReading] = useState<string | null>(null);
+
+  const addFromDocument = async (file: File) => {
+    setReading('Reading the document…');
+    try {
+      const { text, method } = await documentToText(file, {
+        progress: setReading,
+        askPassword: async (wrong) => window.prompt(wrong ? 'Wrong password. Try again (often your date of birth, e.g. 01011990):' : 'This PDF is locked. Enter its password (often your date of birth, e.g. 01011990):'),
+      });
+      setReading('Finding the policy details…');
+      const { extraction } = await financeApi.extractPolicy({ text });
+      const found = extraction.found.length;
+      setDraft({
+        prefill: prefillFromExtraction(extraction), file,
+        note: found ? `Filled ${found} field${found === 1 ? '' : 's'} from the ${method === 'ocr' ? 'scanned ' : ''}document${extraction.method === 'ai' ? ' (AI backup)' : ''}. Check and fill the rest.` : 'Couldn\'t read details automatically - please fill them in. The document will be attached.',
+      });
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setReading(null);
+    }
+  };
 
   if (loading && !data) return <Spinner />;
   if (error) return <ErrorBlock message={error} onRetry={reload} />;
@@ -35,7 +59,15 @@ export default function Insurance() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end"><Button size="sm" onClick={() => setEditing('new')}><Plus className="w-3.5 h-3.5" /> Add policy</Button></div>
+      <div className="flex justify-end gap-2 flex-wrap">
+        <label className={`px-2.5 py-1 text-[11px] rounded-xl font-bold border border-[#E6E1DA] bg-white inline-flex items-center gap-1.5 cursor-pointer ${reading ? 'opacity-60 pointer-events-none' : ''}`}>
+          {reading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSearch className="w-3.5 h-3.5" />} Add from document
+          <input type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void addFromDocument(f); }} />
+        </label>
+        <Button size="sm" onClick={() => setEditing('new')}><Plus className="w-3.5 h-3.5" /> Add policy</Button>
+      </div>
+      {reading && <div className="text-xs text-[#736F6A] flex items-center gap-2"><Loader2 className="w-3.5 h-3.5 animate-spin" />{reading} <span className="text-[#A39E98]">(on this device)</span></div>}
+      <p className="text-[11px] text-[#736F6A] -mt-2">Policies emailed to your Gmail are filed automatically. For paper copies or other PDFs, use "Add from document" - scans are read on your phone.</p>
       {policies.length === 0 ? (
         <Empty title="No policies yet" text="Add each health, life, vehicle or travel policy with its renewal date and premium. Tabby reminds you 30, 7 and 1 days before renewal and links premium payments automatically." action={<Button onClick={() => setEditing('new')}>Add policy</Button>} />
       ) : (
@@ -44,10 +76,11 @@ export default function Insurance() {
             <Card key={p.id} onClick={() => setOpenId(p.id)} className="flex flex-col gap-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-[#EBF1ED] text-[#3C5A48] flex items-center justify-center shrink-0">{p.type === 'health' ? <HeartPulse className="w-4 h-4" /> : <Shield className="w-4 h-4" />}</div>
+                  <div className="w-9 h-9 rounded-xl bg-[#EBF1ED] text-[#3C5A48] flex items-center justify-center shrink-0"><PolicyIcon p={p} /></div>
                   <div className="min-w-0">
                     <div className="text-xs font-bold truncate">{p.insurer}</div>
-                    <div className="text-[11px] text-[#736F6A] truncate">{TYPE_LABEL[p.type]}{p.planName ? ` · ${p.planName}` : ''}{p.policyNumber ? ` · ${p.policyNumber}` : ''}</div>
+                    <div className="text-[11px] text-[#736F6A] truncate">{TYPE_LABEL[p.type]}{p.planName ? ` · ${p.planName}` : ''}{p.vehicleNumber ? ` · ${p.vehicleNumber}` : ''}{p.policyNumber ? ` · ${p.policyNumber}` : ''}</div>
+                    {p.needsCheck && <span className="inline-flex mt-0.5"><Badge tone="blue"><Sparkles className="w-2.5 h-2.5" />Auto-added · tap to check</Badge></span>}
                   </div>
                 </div>
                 <RenewalBadge date={p.renewalDate} status={p.status} />
@@ -72,8 +105,11 @@ export default function Insurance() {
         </Card>
       )}
 
+      <PdfPasswords />
+
       {openId && <PolicyDetail id={openId} onClose={() => setOpenId(null)} onEdit={(p) => { setOpenId(null); setEditing(p); }} onChanged={() => { reload(); tax.reload(); }} />}
       {editing && <PolicyForm policy={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload(); tax.reload(); }} />}
+      {draft && <PolicyForm policy={null} prefill={draft.prefill} pendingFile={draft.file} note={draft.note} onClose={() => setDraft(null)} onSaved={() => { setDraft(null); reload(); tax.reload(); }} />}
     </div>
   );
 }
@@ -98,7 +134,7 @@ function PolicyDetail({ id, onClose, onEdit, onChanged }: { id: string; onClose:
   };
 
   const rows: [string, React.ReactNode][] = [
-    ['Policy number', p.policyNumber || '—'], ['Plan', p.planName || '—'], ['Sum insured', formatPaise(p.sumInsuredPaise)],
+    ['Policy number', p.policyNumber || '—'], ['Plan', p.planName || '—'], ...(p.vehicleNumber ? [['Vehicle', p.vehicleNumber] as [string, string]] : []), ['Sum insured', formatPaise(p.sumInsuredPaise)],
     ['Premium', `${formatPaise(p.premiumPaise)} ${p.premiumFrequency.replace('_', ' ')}`], ['Start', fmtDate(p.startDate) || '—'], ['Renewal', fmtDate(p.renewalDate) || '—'],
     ['Nominee', p.nominee || '—'], ['Payment mode', p.paymentMode || '—'], ['TPA', p.tpa || '—'], ['Claim helpline', p.claimHelpline || '—'],
     ['Agent', [p.agent?.name, p.agent?.phone, p.agent?.email].filter(Boolean).join(' · ') || '—'], ['Tax section', p.taxSection || '—'],
@@ -109,6 +145,12 @@ function PolicyDetail({ id, onClose, onEdit, onChanged }: { id: string; onClose:
       <Button variant="danger" onClick={async () => { if (window.confirm('Delete this policy? Its documents are kept.')) { await financeApi.deletePolicy(p.id); onChanged(); onClose(); } }}>Delete</Button>
       <Button variant="secondary" onClick={() => onEdit(p)}>Edit</Button>
     </>}>
+      {p.needsCheck && (
+        <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-[#EAF2F8] text-xs text-[#22577A]">
+          <span className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />Added automatically from your email. Do these details look right?</span>
+          <Button size="sm" onClick={async () => { try { await financeApi.updatePolicy(p.id, { needsCheck: false }); reload(); onChanged(); } catch (e) { toastError(e); } }}><CheckCircle2 className="w-3.5 h-3.5" /> Looks right</Button>
+        </div>
+      )}
       <div className="flex items-center gap-2"><RenewalBadge date={p.renewalDate} status={p.status} /><Badge>{p.status.replace('_', ' ')}</Badge></div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
         {rows.map(([k, v]) => <div key={k}><div className="text-[10px] text-[#736F6A] uppercase font-bold">{k}</div><div className="font-semibold break-words">{v}</div></div>)}
@@ -180,8 +222,11 @@ function ClaimForm({ policyId, claim, onClose, onSaved }: { policyId: string; cl
   );
 }
 
-function PolicyForm({ policy, onClose, onSaved }: { policy: Policy | null; onClose: () => void; onSaved: () => void }) {
+export function PolicyForm({ policy, prefill, pendingFile, fromRawEventId, note, onClose, onSaved }: {
+  policy: Policy | null; prefill?: Partial<Policy>; pendingFile?: File; fromRawEventId?: string; note?: string; onClose: () => void; onSaved: () => void;
+}) {
   const people = useAsync(() => financeApi.people(), []);
+  if (!policy && prefill) policy = { ...(prefill as Policy), id: '' };
   const [f, setF] = useState({
     insurer: policy?.insurer || '', policyNumber: policy?.policyNumber || '', type: policy?.type || 'health', planName: policy?.planName || '',
     sumInsured: policy ? paiseToInput(policy.sumInsuredPaise) : '', premium: policy ? paiseToInput(policy.premiumPaise) : '',
@@ -189,7 +234,9 @@ function PolicyForm({ policy, onClose, onSaved }: { policy: Policy | null; onClo
     renewalDate: toDateInput(policy?.renewalDate), status: policy?.status || 'active', nominee: policy?.nominee || '', tpa: policy?.tpa || '',
     claimHelpline: policy?.claimHelpline || '', agentName: policy?.agent?.name || '', agentPhone: policy?.agent?.phone || '', agentEmail: policy?.agent?.email || '',
     taxSection: policy?.taxSection || '', notes: policy?.notes || '', members: policy?.insuredMemberIds || [] as string[],
+    vehicleNumber: policy?.vehicleNumber || '',
   });
+  const isNew = !policy?.id;
   const [newPerson, setNewPerson] = useState({ name: '', relation: 'self' });
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
@@ -202,12 +249,24 @@ function PolicyForm({ policy, onClose, onSaved }: { policy: Policy | null; onClo
       ...(f.startDate ? { startDate: `${f.startDate}T00:00:00+05:30` } : {}), ...(f.renewalDate ? { renewalDate: `${f.renewalDate}T00:00:00+05:30` } : {}),
       status: f.status, nominee: f.nominee, tpa: f.tpa, claimHelpline: f.claimHelpline,
       agent: { name: f.agentName || undefined, phone: f.agentPhone || undefined, email: f.agentEmail || undefined },
-      taxSection: f.taxSection || null, notes: f.notes, insuredMemberIds: f.members,
+      taxSection: f.taxSection || null, notes: f.notes, insuredMemberIds: f.members, vehicleNumber: f.vehicleNumber,
+      ...(isNew && fromRawEventId ? { fromRawEventId } : {}),
     };
     setBusy(true);
     try {
-      if (policy) await financeApi.updatePolicy(policy.id, body);
-      else await financeApi.createPolicy(body);
+      if (!isNew) await financeApi.updatePolicy(policy!.id, body);
+      else {
+        const { policy: created } = await financeApi.createPolicy(body);
+        if (pendingFile) {
+          const form = new FormData();
+          form.append('file', pendingFile);
+          form.append('type', 'policy');
+          form.append('title', pendingFile.name || `${f.insurer} policy`);
+          form.append('linkKind', 'policy');
+          form.append('linkId', created.id);
+          await financeApi.uploadDocument(form);
+        }
+      }
       toastOk('Policy saved');
       onSaved();
     } catch (e) {
@@ -218,12 +277,14 @@ function PolicyForm({ policy, onClose, onSaved }: { policy: Policy | null; onClo
   };
 
   return (
-    <Sheet title={policy ? `Edit ${policy.insurer}` : 'Add policy'} onClose={onClose} wide footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button busy={busy} onClick={save}>Save</Button></>}>
+    <Sheet title={!isNew ? `Edit ${policy!.insurer}` : 'Add policy'} onClose={onClose} wide footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button busy={busy} onClick={save}>Save</Button></>}>
+      {note && <div className="p-3 rounded-xl bg-[#EAF2F8] text-xs text-[#22577A] flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 shrink-0" />{note}</div>}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Field label="Insurer"><TextInput value={f.insurer} onChange={set('insurer')} placeholder="Care Health Insurance" /></Field>
         <Field label="Type"><Select value={f.type} onChange={(v) => setF({ ...f, type: v as any })}>{Object.entries(TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
         <Field label="Policy number"><TextInput value={f.policyNumber} onChange={set('policyNumber')} /></Field>
         <Field label="Plan"><TextInput value={f.planName} onChange={set('planName')} /></Field>
+        {f.type === 'vehicle' && <Field label="Vehicle number"><TextInput value={f.vehicleNumber} onChange={(e) => setF({ ...f, vehicleNumber: e.target.value.toUpperCase() })} placeholder="KA05MX4821" /></Field>}
         <Field label="Sum insured (₹)"><TextInput inputMode="decimal" value={f.sumInsured} onChange={set('sumInsured')} /></Field>
         <Field label="Premium (₹)"><TextInput inputMode="decimal" value={f.premium} onChange={set('premium')} /></Field>
         <Field label="Premium every"><Select value={f.premiumFrequency} onChange={(v) => setF({ ...f, premiumFrequency: v as any })}>{['monthly', 'quarterly', 'half_yearly', 'yearly', 'single'].map((x) => <option key={x} value={x}>{x.replace('_', ' ')}</option>)}</Select></Field>
@@ -259,5 +320,48 @@ function PolicyForm({ policy, onClose, onSaved }: { policy: Policy | null; onClo
       </div>
       <Field label="Notes"><TextArea value={f.notes} onChange={set('notes')} placeholder="Waiting periods, exclusions, network hospitals…" /></Field>
     </Sheet>
+  );
+}
+
+function PolicyIcon({ p }: { p: Policy }) {
+  if (p.type === 'health') return <HeartPulse className="w-4 h-4" />;
+  if (p.type === 'vehicle') return /car/i.test(p.planName) ? <Car className="w-4 h-4" /> : <Bike className="w-4 h-4" />;
+  return <Shield className="w-4 h-4" />;
+}
+
+/** Extraction (from the server) -> fields for the policy form. */
+export function prefillFromExtraction(x: PolicyExtraction): Partial<Policy> {
+  return {
+    insurer: x.insurer || '', policyNumber: x.policyNumber || '', type: x.type || 'other', planName: x.planName || '',
+    vehicleNumber: x.vehicleNumber || '', sumInsuredPaise: x.sumInsuredPaise || 0, premiumPaise: x.premiumPaise || 0,
+    startDate: x.startDate, renewalDate: x.endDate, nominee: x.nominee || '', premiumFrequency: 'yearly', status: 'active',
+    taxSection: x.type === 'health' ? '80D' : x.type === 'life' || x.type === 'term_life' ? '80C' : null,
+    insuredMemberIds: [], agent: {}, claimHelpline: '', tpa: '', paymentMode: '', notes: '', documentIds: [], premiumTransactionIds: [],
+  };
+}
+
+/** Passwords for locked policy PDFs, tried automatically on new emails. Write-only. */
+function PdfPasswords() {
+  const { data, reload } = useAsync(() => financeApi.docPasswords(), []);
+  const [label, setLabel] = useState('');
+  const [password, setPassword] = useState('');
+  return (
+    <Card className="flex flex-col gap-2">
+      <SectionTitle><span className="inline-flex items-center gap-1"><KeyRound className="w-3.5 h-3.5" /> PDF passwords</span></SectionTitle>
+      <p className="text-[11px] text-[#736F6A]">Some insurers lock policy PDFs (often with your date of birth). Save the password once; new policy emails are opened with it automatically. Stored encrypted and never shown again.</p>
+      {(data?.passwords || []).map((p) => (
+        <div key={p.id} className="flex items-center justify-between text-xs">
+          <span>{p.label} · ••••••</span>
+          <button type="button" aria-label="Delete password" className="p-1 text-[#A39E98] hover:text-[#C86D51] cursor-pointer" onClick={async () => { await financeApi.deleteDocPassword(p.id); reload(); }}><Trash2 className="w-3.5 h-3.5" /></button>
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <TextInput placeholder="Label, e.g. Acko (DOB)" value={label} onChange={(e) => setLabel(e.target.value)} />
+        <TextInput type="password" autoComplete="off" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Button size="sm" disabled={!label || !password} onClick={async () => {
+          try { await financeApi.addDocPassword(label, password); setLabel(''); setPassword(''); toastOk('Saved'); reload(); } catch (e) { toastError(e); }
+        }}>Save</Button>
+      </div>
+    </Card>
   );
 }

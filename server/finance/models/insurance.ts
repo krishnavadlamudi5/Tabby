@@ -29,6 +29,11 @@ export interface IPolicy {
   premiumTransactionIds: Types.ObjectId[];
   documentIds: Types.ObjectId[];
   notes: string;
+  vehicleNumber: string;
+  /** Filed automatically from an email; needsCheck until the owner opens/saves it. */
+  autoAdded: boolean;
+  needsCheck: boolean;
+  sourceRawEventId: Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,7 +61,12 @@ const PolicySchema = new Schema<any>({
   premiumTransactionIds: { type: [Schema.Types.ObjectId], default: [] },
   documentIds: { type: [Schema.Types.ObjectId], default: [] },
   notes: { type: String, default: '' },
+  vehicleNumber: { type: String, default: '', uppercase: true, trim: true },
+  autoAdded: { type: Boolean, default: false },
+  needsCheck: { type: Boolean, default: false },
+  sourceRawEventId: { type: Schema.Types.ObjectId, default: null },
 }, financeSchemaOptions());
+PolicySchema.index({ ownerId: 1, policyNumber: 1 });
 export const Policy = model<IPolicy>('FinPolicy', PolicySchema);
 
 export interface IPerson {
@@ -102,3 +112,18 @@ const ClaimSchema = new Schema<any>({
   notes: { type: String, default: '' },
 }, financeSchemaOptions());
 export const Claim = model<IClaim>('FinClaim', ClaimSchema);
+
+/** Passwords for locked PDFs (insurers often use date of birth). Write-only. */
+export interface IDocPassword {
+  _id: Types.ObjectId;
+  ownerId: string;
+  label: string;
+  passwordEnc: string;
+}
+
+const DocPasswordSchema = new Schema<any>({
+  ownerId: ownerField,
+  label: { type: String, required: true, trim: true },
+  passwordEnc: { type: String, required: true },
+}, financeSchemaOptions(['passwordEnc']));
+export const DocPassword = model<IDocPassword>('FinDocPassword', DocPasswordSchema);

@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { Check, EyeOff, MailX, Tag } from 'lucide-react';
+import { Check, EyeOff, FileSearch, Loader2, MailX, Shield, Tag } from 'lucide-react';
+import { PolicyForm, prefillFromExtraction } from './Insurance';
+import { documentToText } from '../ocr';
+import type { Policy } from '../types';
 import { financeApi } from '../api';
 import { useFinanceStore } from '../store';
 import {
@@ -73,7 +76,34 @@ function EventCard({ e, onDone }: { key?: string; e: ReviewEvent; onDone: () => 
   const [categoryId, setCategoryId] = useState<string | null>(t?.categoryId || null);
   const [showBody, setShowBody] = useState(false);
   const [busy, setBusy] = useState(false);
-  const isMoney = !['policy_suggestion', 'statement_email', 'statement_password_needed', 'order_waiting_for_payment'].includes(e.reason);
+  const isPolicy = e.detectedType === 'policy' || e.reason.startsWith('policy_');
+  const isMoney = !isPolicy && !['statement_email', 'statement_password_needed', 'order_waiting_for_payment'].includes(e.reason);
+  const [policyDraft, setPolicyDraft] = useState<{ prefill: Partial<Policy>; note: string } | null>(null);
+  const [reading, setReading] = useState<string | null>(null);
+
+  const createPolicy = async () => {
+    setReading('Reading…');
+    try {
+      let text: string | undefined;
+      const pdf = e.attachments.find((a) => a.mimeType === 'application/pdf' || a.mimeType.startsWith('image/'));
+      if (pdf && e.reason !== 'policy_suggestion') {
+        // Scanned or locked PDF: open and read it here on the phone.
+        const blob = await financeApi.downloadDocument(pdf.documentId);
+        const file = new File([blob], pdf.filename, { type: pdf.mimeType });
+        text = (await documentToText(file, {
+          progress: setReading,
+          askPassword: async (wrong) => window.prompt(wrong ? 'Wrong password. Try again:' : 'This PDF is locked. Enter its password (often your date of birth, e.g. 01011990):'),
+        })).text;
+      }
+      setReading('Finding the policy details…');
+      const { extraction } = await financeApi.extractPolicy({ rawEventId: e.id, ...(text ? { text } : {}) });
+      setPolicyDraft({ prefill: prefillFromExtraction(extraction), note: `Filled ${extraction.found.length} field(s) from the email${text ? ' and its document' : ''}. Check and save; the document will be attached.` });
+    } catch (err) {
+      toastError(err);
+    } finally {
+      setReading(null);
+    }
+  };
 
   const act = async (fn: () => Promise<unknown>, msg: string) => {
     setBusy(true);
@@ -123,7 +153,16 @@ function EventCard({ e, onDone }: { key?: string; e: ReviewEvent; onDone: () => 
         </div>
       )}
       {e.reason === 'unknown_account' && <span className="text-[11px] text-[#736F6A]">Tip: add the account (with this last-4 number) under Accounts so future emails land there automatically.</span>}
-      {e.reason === 'policy_suggestion' && <span className="text-[11px] text-[#736F6A]">Add or update the policy under Insurance, then dismiss this.</span>}
+      {isPolicy && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button size="sm" busy={Boolean(reading)} onClick={createPolicy}>
+            {e.reason === 'policy_scan_needed' ? <><FileSearch className="w-3.5 h-3.5" /> Scan & add policy</> : <><Shield className="w-3.5 h-3.5" /> Create policy</>}
+          </Button>
+          {reading && <span className="text-[11px] text-[#736F6A] inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />{reading}</span>}
+          {e.reason === 'policy_password_needed' && <span className="text-[11px] text-[#736F6A]">Or save the PDF password under Insurance → PDF passwords.</span>}
+        </div>
+      )}
+      {policyDraft && <PolicyForm policy={null} prefill={policyDraft.prefill} fromRawEventId={e.id} note={policyDraft.note} onClose={() => setPolicyDraft(null)} onSaved={() => { setPolicyDraft(null); toastOk('Policy saved'); onDone(); }} />}
       {e.reason === 'statement_password_needed' && <span className="text-[11px] text-[#736F6A]">Save the statement password on the account, then upload the PDF from Accounts.</span>}
       <div className="flex flex-wrap justify-end gap-2">
         <Button size="sm" variant="ghost" busy={busy} onClick={() => act(() => financeApi.ignoreSender(e.id), 'Sender ignored')}><MailX className="w-3.5 h-3.5" /> Always ignore sender</Button>

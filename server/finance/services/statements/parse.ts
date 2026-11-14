@@ -1,3 +1,5 @@
+import { createRequire } from 'module';
+import path from 'path';
 import Papa from 'papaparse';
 import { parseAmountToPaise } from '../../lib/money';
 import { parseIndianDate } from '../../lib/time';
@@ -116,7 +118,7 @@ export async function parsePdfStatement(data: Buffer, password?: string): Promis
   const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
   let doc: any;
   try {
-    doc = await pdfjs.getDocument({ data: new Uint8Array(data), password, isEvalSupported: false, useSystemFonts: false }).promise;
+    doc = await pdfjs.getDocument({ data: new Uint8Array(data), password, isEvalSupported: false, useSystemFonts: false, standardFontDataUrl: standardFontsDir() }).promise;
   } catch (err: any) {
     if (err?.name === 'PasswordException') {
       throw new StatementParseError(
@@ -190,4 +192,10 @@ export function parseStatementTextLines(textLines: string[]): ParsedStatement {
   }
   if (!lines.length) throw new StatementParseError('No transactions found in this PDF (scanned PDFs are not supported; use the CSV export)');
   return { lines, openingBalancePaise: opening, closingBalancePaise: lines[lines.length - 1].balancePaise };
+}
+
+/** pdf.js needs its bundled standard fonts in Node (avoids a warning on every PDF). */
+function standardFontsDir(): string {
+  const require = createRequire(import.meta.url);
+  return path.join(path.dirname(require.resolve('pdfjs-dist/package.json')), 'standard_fonts') + path.sep;
 }

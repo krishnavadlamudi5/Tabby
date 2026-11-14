@@ -102,6 +102,7 @@ export interface ReviewEvent {
   extracted: any;
   bodyPreview: string;
   transactions: Transaction[];
+  attachments: { documentId: string; filename: string; mimeType: string }[];
 }
 
 export interface Statement {
@@ -152,6 +153,24 @@ export interface Policy {
   premiumTransactionIds: string[];
   documentIds: string[];
   notes: string;
+  vehicleNumber: string;
+  autoAdded: boolean;
+  needsCheck: boolean;
+}
+
+export interface PolicyExtraction {
+  insurer?: string;
+  policyNumber?: string;
+  type?: PolicyType;
+  planName?: string;
+  vehicleNumber?: string;
+  sumInsuredPaise?: number;
+  premiumPaise?: number;
+  startDate?: string;
+  endDate?: string;
+  nominee?: string;
+  found: string[];
+  method: 'labels' | 'ai' | 'none';
 }
 
 export interface Claim {

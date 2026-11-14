@@ -1,6 +1,6 @@
 import { apiDownload, apiRequest } from '../../lib/api';
 import type {
-  Account, Alert, Category, Claim, Commitment, Dashboard, FinDocument, Person, Policy, ReviewEvent, Rule, SplitTemplate, Statement, Transaction,
+  Account, Alert, Category, Claim, Commitment, Dashboard, FinDocument, Person, Policy, PolicyExtraction, ReviewEvent, Rule, SplitTemplate, Statement, Transaction,
 } from './types';
 
 const F = '/finance';
@@ -73,6 +73,10 @@ export const financeApi = {
   createPolicy: (body: Record<string, unknown>) => apiRequest<{ policy: Policy }>(`${F}/policies`, { method: 'POST', body }),
   updatePolicy: (id: string, body: Record<string, unknown>) => apiRequest<{ policy: Policy }>(`${F}/policies/${id}`, { method: 'PATCH', body }),
   deletePolicy: (id: string) => apiRequest(`${F}/policies/${id}`, { method: 'DELETE' }),
+  extractPolicy: (body: { text?: string; sender?: string; subject?: string; rawEventId?: string }) => apiRequest<{ extraction: PolicyExtraction; attachments?: { documentId?: string; filename: string; mimeType: string }[]; aiAvailable?: boolean }>(`${F}/policies/extract`, { method: 'POST', body }),
+  docPasswords: () => apiRequest<{ passwords: { id: string; label: string }[] }>(`${F}/doc-passwords`),
+  addDocPassword: (label: string, password: string) => apiRequest(`${F}/doc-passwords`, { method: 'POST', body: { label, password } }),
+  deleteDocPassword: (id: string) => apiRequest(`${F}/doc-passwords/${id}`, { method: 'DELETE' }),
   linkPremiums: (id: string) => apiRequest<{ linked: number }>(`${F}/policies/${id}/link-premiums`, { method: 'POST', body: {} }),
   tax: (fy?: string) => apiRequest<{ fy: string; rows: { policyId: string; insurer: string; planName: string; section: string; paidPaise: number; payments: number }[]; totals: { '80C': number; '80D': number } }>(`${F}/policies/tax${qs({ fy })}`),
   people: () => apiRequest<{ people: Person[] }>(`${F}/people`),
