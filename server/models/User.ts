@@ -33,4 +33,13 @@ const UserSchema: Schema = new Schema({
   createdAt: { type: String, default: () => new Date().toISOString() },
 });
 
+// Never serialise the password hash, even on documents where it was loaded
+// (select('+password')) or freshly created with its default value.
+UserSchema.set('toJSON', {
+  transform(_doc: unknown, ret: Record<string, any>) {
+    delete ret.password;
+    return ret;
+  },
+});
+
 export const User: Model<IUser> = (mongoose.models.User as Model<IUser>) || mongoose.model<IUser>('User', UserSchema);
