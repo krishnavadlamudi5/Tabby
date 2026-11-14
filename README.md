@@ -1,20 +1,68 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Tabby
 
-# Run and deploy your AI Studio app
+Split shared expenses with friends (groups, trips, settle-up), with a personal
+finance layer being added on top. See [FINANCE_PLAN.md](FINANCE_PLAN.md) for
+the roadmap.
 
-This contains everything you need to run your app locally.
+| Part | Where it runs |
+|---|---|
+| API (`server/`) | Express + Mongoose on Render (`https://tabby-6i0f.onrender.com/api`) |
+| Database | MongoDB Atlas |
+| Web app (`src/`) | React + Vite on Netlify |
+| Android app | Capacitor 8 (`com.tabby.app`), updated over the air from GitHub Releases |
 
-View your app in AI Studio: https://ai.studio/apps/7031ddf8-f39d-46a7-a022-1399e7554e07
+How builds, APKs and in-app OTA updates work:
+[.agents/rules/apk_ota_workflow.md](.agents/rules/apk_ota_workflow.md).
 
-## Run Locally
+## Run locally
 
-**Prerequisites:**  Node.js
+Requires Node.js 22.
 
+```bash
+npm install
+cp .env.example .env
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+In `.env`, set at least `JWT_SECRET` (any long random string) and
+`MONGODB_URI`. To get sample data in your local database, also set
+`SEED_DEMO=true`.
+
+```bash
+npm run dev
+```
+
+This starts the API on http://localhost:5000 and the web app on
+http://localhost:3030 (which proxies `/api` to the API).
+
+Sign in with Google, or press **Try the demo** to explore sample data that
+stays on your device.
+
+## Scripts
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | API and web app together |
+| `npm run lint` | TypeScript type check |
+| `npm test` | Unit and API tests (vitest, supertest, in-memory MongoDB) |
+| `npm run build` | Production web build into `dist/` |
+| `npm run cap:sync` | Build and copy the web app into the Android project |
+
+The first `npm test` downloads a MongoDB binary (about 120 MB) from
+`fastdl.mongodb.org` and caches it.
+
+## Deploying
+
+- **API:** Render deploys `server/` with `npm start`. Set the variables from
+  `.env.example` there. The server will not start without `JWT_SECRET`.
+- **Web and Android:** pushing frontend changes to `main` builds the web app,
+  publishes a GitHub Release with `dist.zip`, and installed apps offer the
+  update in-app. Native changes (`android/`, `capacitor.config.ts`, new
+  plugins) need a new APK from the "Build APK" workflow.
+
+## Security notes
+
+- Every `/api` route except `/api/health` and `/api/auth/google` needs a
+  `Bearer` session token, and every query is scoped to the signed-in user.
+- Never put secrets in `VITE_` variables; they are bundled into the app.
+- MongoDB Atlas network access is open to `0.0.0.0/0` so Render can reach it:
+  keep a long random database password and rotate it periodically.
