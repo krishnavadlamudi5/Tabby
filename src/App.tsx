@@ -212,7 +212,7 @@ export default function App() {
                 <span className="font-extrabold text-white text-[13px] sm:text-sm truncate drop-shadow-sm">
                   {isLiveDownloading
                     ? `Downloading Update... (${liveDownloadProgress}%)`
-                    : (liveUpdateError ? 'Update Failed' : `Update ${liveLatestVersion || ''} Available!`)}
+                    : (liveUpdateError ? 'Update Failed' : `Update ${liveLatestVersion ? `v${liveLatestVersion}` : ''} Available!`)}
                 </span>
                 <span className="text-[11px] sm:text-xs text-emerald-100/90 truncate font-medium">
                   {isLiveDownloading

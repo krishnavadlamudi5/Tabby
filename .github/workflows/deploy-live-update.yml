@@ -21,6 +21,20 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history: the app version is the commit count
+
+      - name: Compute App Version
+        id: version
+        # One version per commit, derived from git history, so the APK and the
+        # OTA bundle built from the same commit always carry the same number.
+        # 1.1.x is used so it sorts above the legacy v1.0.<run_number> tags.
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "version=1.1.$COUNT" >> "$GITHUB_OUTPUT"
+          echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "App version: 1.1.$COUNT"
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -36,6 +50,9 @@ jobs:
         env:
           VITE_API_URL: https://tabby-6i0f.onrender.com/api
           VITE_GOOGLE_CLIENT_ID: 888676247797-cn7buordb6vqmd7qm6a35u8n6smievcr.apps.googleusercontent.com
+          VITE_APP_VERSION: ${{ steps.version.outputs.version }}
+          VITE_APP_COMMIT: ${{ github.sha }}
+          VITE_APP_BUILD_DATE: ${{ steps.version.outputs.date }}
 
       - name: Package dist folder into dist.zip
         run: |
@@ -66,14 +83,14 @@ jobs:
       - name: Create GitHub Release with dist.zip
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: v1.0.${{ github.run_number }} - ${{ steps.commit_info.outputs.title }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }} - ${{ steps.commit_info.outputs.title }}
           body: |
             ### 🚀 What's New in this Update:
             ${{ steps.commit_info.outputs.title }}
 
             ---
-            - **Version**: `v1.0.${{ github.run_number }}`
+            - **Version**: `v${{ steps.version.outputs.version }}`
             - **Commit**: `${{ github.sha }}`
             - **Build**: #${{ github.run_number }}
             - **Date**: ${{ github.event.head_commit.timestamp }}

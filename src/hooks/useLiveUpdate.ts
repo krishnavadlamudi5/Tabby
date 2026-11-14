@@ -32,6 +32,39 @@ const STORAGE_DISMISSED_VERSION_KEY = 'tabby_dismissed_update_version';
 const STORAGE_RELEASE_ETAG_KEY = 'tabby_gh_release_etag';
 const STORAGE_RELEASE_CACHE_KEY = 'tabby_gh_release_cache';
 
+/** "v1.1.57_cachebust_123" -> "1.1.57" */
+function normalizeVersion(v: string | null | undefined): string {
+  return (v || '').trim().replace(/^v/i, '').split('_cachebust_')[0];
+}
+
+function parseVersion(v: string): number[] | null {
+  return /^\d+(\.\d+)*$/.test(v) ? v.split('.').map(Number) : null;
+}
+
+/** True when `remote` is strictly newer than `current`. An unknown current version always loses. */
+function isNewerVersion(remote: string, current: string): boolean {
+  const r = parseVersion(remote);
+  if (!r) return false;
+  const c = parseVersion(current);
+  if (!c) return true;
+  for (let i = 0; i < Math.max(r.length, c.length); i++) {
+    const diff = (r[i] ?? 0) - (c[i] ?? 0);
+    if (diff !== 0) return diff > 0;
+  }
+  return false;
+}
+
+/**
+ * Version/commit/date baked into this exact JS bundle at build time by CI.
+ * Because it travels inside the bundle, it is correct both for the code that
+ * shipped inside the APK and for any OTA bundle applied later.
+ */
+export const BUILD_INFO = {
+  version: normalizeVersion(import.meta.env.VITE_APP_VERSION) || null,
+  commit: import.meta.env.VITE_APP_COMMIT || null,
+  buildDate: import.meta.env.VITE_APP_BUILD_DATE || null,
+};
+
 /**
  * Resolves any HTTP 301/302 redirects to obtain the direct asset URL (e.g. AWS/Azure CDN link from GitHub Release).
  * Android's background HttpURLConnection in DownloadWorker does not automatically follow cross-domain redirects.
@@ -145,7 +178,7 @@ export function useLiveUpdate(): LiveUpdateState {
           localStorage.setItem(STORAGE_RELEASE_CACHE_KEY, JSON.stringify(release));
         }
       }
-      const remoteVersion = release.tag_name || release.name;
+      const remoteVersion = normalizeVersion(release.tag_name || release.name);
       const zipAsset = release.assets?.find((asset: { name: string; browser_download_url: string }) => asset.name === 'dist.zip');
 
       if (!remoteVersion || !zipAsset) {
@@ -155,19 +188,21 @@ export function useLiveUpdate(): LiveUpdateState {
         return 'error';
       }
 
-      // Check current local version
+      // Check current local version: prefer the version baked into this bundle.
       let currentVersion = '0.0.0';
-      if (Capacitor.isNativePlatform()) {
+      if (BUILD_INFO.version) {
+        currentVersion = BUILD_INFO.version;
+      } else if (Capacitor.isNativePlatform()) {
         try {
           const current = await CapacitorUpdater.current();
           currentVersion = current?.bundle?.version || '0.0.0';
-          currentVersion = currentVersion.split('_cachebust_')[0];
+          currentVersion = normalizeVersion(currentVersion);
         } catch (e) {
           console.warn('Could not determine native bundle version:', e);
         }
       } else {
         currentVersion = localStorage.getItem(STORAGE_CURRENT_VERSION_KEY) || '0.0.0';
-        currentVersion = currentVersion.split('_cachebust_')[0];
+        currentVersion = normalizeVersion(currentVersion);
       }
 
       setCurrentVersion(currentVersion);
@@ -175,7 +210,7 @@ export function useLiveUpdate(): LiveUpdateState {
       // Check if this release was dismissed in this session
       const dismissedVersion = sessionStorage.getItem(STORAGE_DISMISSED_VERSION_KEY);
 
-      if (remoteVersion !== currentVersion) {
+      if (isNewerVersion(remoteVersion, currentVersion)) {
         setLatestVersion(remoteVersion);
         setDownloadUrl(zipAsset.browser_download_url);
         setReleaseNotes(release.body || 'New enhancements and bug fixes.');

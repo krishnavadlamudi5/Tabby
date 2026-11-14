@@ -8,7 +8,7 @@ import { User } from '../types';
 import { SUPPORTED_CURRENCIES, formatAmount, getCurrencyConfig } from '../utils/currency';
 import { exportExpensesToCSV } from '../utils/export';
 import { X, Settings, DollarSign, User as UserIcon, RotateCcw, Check, Sparkles, Globe, Shield, Download, RefreshCw } from 'lucide-react';
-import type { UpdateCheckResult } from '../hooks/useLiveUpdate';
+import { BUILD_INFO, type UpdateCheckResult } from '../hooks/useLiveUpdate';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -197,12 +197,29 @@ export default function SettingsModal({
                   <RefreshCw className="w-3.5 h-3.5 text-[#3C5A48]" />
                   App Updates
                 </label>
-                <p className="text-xs text-[#736F6A]">
-                  Installed version:{' '}
-                  <span className="font-bold text-[#2C2B29]">
-                    {!appVersion || appVersion === 'builtin' || appVersion === '0.0.0' ? 'Original install' : appVersion}
-                  </span>
-                </p>
+                <div className="p-3 bg-[#FAF8F5] border border-[#E6E1DA] rounded-xl flex flex-col gap-1 text-xs text-[#736F6A]">
+                  <div className="flex justify-between gap-2">
+                    <span>Installed version</span>
+                    <span className="font-bold text-[#2C2B29]" id="settings-installed-version">
+                      {(() => {
+                        const v = BUILD_INFO.version || appVersion;
+                        return v && /^\d/.test(v) ? `v${v}` : 'Development build';
+                      })()}
+                    </span>
+                  </div>
+                  {BUILD_INFO.commit && (
+                    <div className="flex justify-between gap-2">
+                      <span>Commit</span>
+                      <span className="font-mono text-[#2C2B29]">{BUILD_INFO.commit.slice(0, 7)}</span>
+                    </div>
+                  )}
+                  {BUILD_INFO.buildDate && (
+                    <div className="flex justify-between gap-2">
+                      <span>Built</span>
+                      <span className="text-[#2C2B29]">{new Date(BUILD_INFO.buildDate).toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
                 {isAppUpdateAvailable && latestAppVersion ? (
                   <button
                     type="button"
@@ -212,7 +229,7 @@ export default function SettingsModal({
                     id="settings-apply-update-btn"
                   >
                     <Download className="w-4 h-4" />
-                    {isDownloadingAppUpdate ? 'Downloading…' : `Install ${latestAppVersion}`}
+                    {isDownloadingAppUpdate ? 'Downloading…' : `Install v${latestAppVersion}`}
                   </button>
                 ) : (
                   <button

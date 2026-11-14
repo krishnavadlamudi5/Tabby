@@ -7,10 +7,11 @@ android {
         applicationId "com.tabby.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // CI passes its run number so every GitHub-built APK installs as an upgrade
-        // over the previous one. Local builds stay at 1.
-        versionCode((System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger())
-        versionName "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"
+        // CI passes the git commit count (versionCode) and the matching app
+        // version (versionName, e.g. 1.1.57) so every GitHub-built APK installs
+        // as an upgrade and matches the OTA release built from the same commit.
+        versionCode((System.getenv("TABBY_VERSION_CODE") ?: "1").toInteger())
+        versionName(System.getenv("TABBY_VERSION_NAME") ?: "dev")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
