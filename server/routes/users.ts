@@ -1,6 +1,8 @@
 import { Router, Response } from 'express';
 import { User } from '../models/User';
 import { requireAuth, AuthedRequest } from '../middleware/auth';
+import { z } from 'zod';
+import { findVisibleUsers } from '../services/userVisibility';
 
 const router = Router();
 
@@ -20,20 +22,17 @@ function pickWhitelisted(body: any): Record<string, any> {
 // All routes below require a valid session.
 router.use(requireAuth);
 
-// GET /api/users?ids=id1,id2 - used to resolve names/avatars for friends and
-// group members. Read-only and deliberately not restricted to "my" ids
-// (any signed-in user can look up public profile fields for anyone they
-// already know the id of), but the password hash is never selected/returned.
+// GET /api/users?ids=id1,id2 - resolves names/avatars for the caller, their
+// friends, people who added them, and members of their groups. Nobody else is
+// ever returned, with or without ?ids=, and other users' phone numbers are
+// only included for the caller's own friends.
 router.get('/', async (req: AuthedRequest, res: Response): Promise<void> => {
   try {
-    const idsQuery = req.query.ids as string;
-    let users;
-    if (idsQuery) {
-      const ids = idsQuery.split(',').map(i => i.trim()).filter(Boolean);
-      users = await User.find({ id: { $in: ids } });
-    } else {
-      users = await User.find().limit(100);
-    }
+    const idsQuery = req.query.ids as string | undefined;
+    const ids = idsQuery
+      ? idsQuery.split(',').map((i) => i.trim()).filter(Boolean)
+      : undefined;
+    const users = await findVisibleUsers(req.userId as string, ids);
 
     res.json({ success: true, users });
   } catch (error: any) {
@@ -66,6 +65,42 @@ router.put('/me', async (req: AuthedRequest, res: Response): Promise<void> => {
     console.error('Update profile error:', error);
     res.status(500).json({ error: error.message || 'Failed to update profile' });
   }
+});
+
+// --- Preferences (synced across devices) ------------------------------
+const ALERT_GROUPS = ['renewals', 'commitments', 'declined', 'large_debit', 'refunds', 'documents', 'statements', 'policies', 'new_accounts'] as const;
+const channel = z.enum(['off', 'app', 'email']);
+const preferencesBody = z.object({
+  homeView: z.enum(['dashboard', 'money']).optional(),
+  reportBasis: z.enum(['fy', 'calendar']).optional(),
+  currency: z.string().length(3).optional(),
+  largeDebitPaise: z.number().int().min(0).max(1_00_00_00_000).nullable().optional(),
+  alerts: z.object(Object.fromEntries(ALERT_GROUPS.map((g) => [g, channel.optional()]))).optional(),
+});
+
+// GET /api/users/me/preferences
+router.get('/me/preferences', async (req: AuthedRequest, res: Response): Promise<void> => {
+  const user = await User.findOne({ id: req.userId }, { preferences: 1 });
+  res.json({ success: true, preferences: user?.preferences || {}, alertGroups: ALERT_GROUPS });
+});
+
+// PUT /api/users/me/preferences - merges the fields sent.
+router.put('/me/preferences', async (req: AuthedRequest, res: Response): Promise<void> => {
+  const parsed = preferencesBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid preferences', details: parsed.error.issues.map((i) => i.path.join('.') + ': ' + i.message) });
+    return;
+  }
+  const set: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(parsed.data)) {
+    if (k === 'alerts' && v) {
+      for (const [g, c] of Object.entries(v)) if (c) set[`preferences.alerts.${g}`] = c;
+    } else if (v !== undefined) {
+      set[`preferences.${k}`] = v;
+    }
+  }
+  const user = await User.findOneAndUpdate({ id: req.userId }, { $set: set }, { returnDocument: 'after' });
+  res.json({ success: true, preferences: user?.preferences || {} });
 });
 
 // PUT /api/users/:id - kept for backward compatibility with the shape the

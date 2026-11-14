@@ -75,6 +75,6 @@ The repository uses two automated GitHub Actions workflows triggered on push to 
 ## 5. APK Signing & Upgrade Rules
 
 * Debug APKs are signed with the committed key `android/app/tabby-debug.keystore` (configured in `android/app/build.gradle`). Do not delete or regenerate it: a different key makes Android refuse to install a new APK over an existing one, forcing an uninstall that wipes local app data.
-* **Versioning:** every build's version is `1.1.<git commit count>` (computed in both workflows with full history). The APK (`versionName`, `versionCode` = commit count) and the OTA release built from the same commit share the same version. The version, commit and build date are baked into the JS bundle (`VITE_APP_VERSION`, `VITE_APP_COMMIT`, `VITE_APP_BUILD_DATE`) and shown in Settings → App Updates.
+* **Versioning:** every build's version is `1.1.<git commit count>` (computed in both workflows with full history). The APK (`versionName`, `versionCode` = commit count) and the OTA release built from the same commit share the same version. The version, commit and build date are baked into the JS bundle (`VITE_APP_VERSION`, `VITE_APP_COMMIT`, `VITE_APP_BUILD_DATE`) and shown in Settings → About & app updates.
 * The app only offers an update when the latest release is numerically newer than the running bundle, so it never offers a downgrade. Legacy `v1.0.<run_number>` tags sort below `1.1.x`.
-* Users can trigger an update check manually from **Settings → App Updates → Check for Updates** (in addition to the automatic launch / 15-minute checks).
+* Users can trigger an update check manually from **Settings → About & app updates → Check for updates** (profile menu → App updates) (in addition to the automatic launch / 15-minute checks).

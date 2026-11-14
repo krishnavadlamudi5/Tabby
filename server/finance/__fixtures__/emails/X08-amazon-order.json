@@ -1,0 +1,13 @@
+{
+  "sender": "auto-confirm@amazon.in",
+  "subject": "Your Amazon.in order of \"boAt Airdopes 141...\" has been placed",
+  "receivedAt": "2026-11-11T09:00:00Z",
+  "bodyText": "Hello Test,\nThank you for your order.\nOrder #408-1234567-7654321\nboAt Airdopes 141 Bluetooth Earbuds Qty: 1 ₹1,299.00\nPhilips Trimmer BT1232 Qty: 1 ₹1,099.00\nItem Subtotal: ₹2,398.00\nShipping: ₹0.00\nOrder Total: ₹2,398.00\nPaid by Visa ending in 5002",
+  "expected": {
+    "eventType": "order",
+    "amountPaise": 239800,
+    "merchant": "Amazon",
+    "orderId": "408-1234567-7654321"
+  },
+  "messageId": "msg-X08-amazon-order"
+}

@@ -1,0 +1,11 @@
+{
+  "sender": "bankalerts@kotak.bank.in",
+  "subject": "IMPS Debit Transaction-Success",
+  "receivedAt": "2026-11-03T06:10:00Z",
+  "bodyText": "Dear Customer,\nyour Account xx9564 is debited for Rs. 12000.00 on 03-Nov-2026 towards IMPS transaction.\nBeneficiary Name: TEST OWNER\nBeneficiary Account No: XXXXXXXX1537\nBeneficiary IFSC: ICIC0002386\nIMPS Reference No: 630709112233",
+  "expected": {
+    "eventType": "transaction",
+    "amountPaise": 1200000
+  },
+  "messageId": "msg-X03-kotak-imps-self-12000"
+}

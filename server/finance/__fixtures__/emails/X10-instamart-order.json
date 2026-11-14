@@ -1,0 +1,12 @@
+{
+  "sender": "noreply@swiggy.in",
+  "subject": "Your Instamart order summary",
+  "receivedAt": "2026-11-13T11:00:00Z",
+  "bodyText": "Order No: 178899001122\nItems\nAmul Gold Milk 1 L x 2 ₹136\nFresh Tomato 1 kg x 1 ₹48\nSurf Excel Matic 1 kg x 1 ₹230\nItem Total ₹414\nDelivery Fee ₹25\nGrand Total ₹439",
+  "expected": {
+    "eventType": "order",
+    "amountPaise": 43900,
+    "merchant": "Swiggy Instamart"
+  },
+  "messageId": "msg-X10-instamart-order"
+}

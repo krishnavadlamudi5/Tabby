@@ -1,0 +1,10 @@
+{
+  "sender": "bankalerts@kotak.bank.in",
+  "subject": "Limit Modification on Kotak Card",
+  "receivedAt": "2026-11-14T15:10:00Z",
+  "bodyText": "Dear Customer, The domestic ECOM limit on your Kotak Bank Debit Card XX2797 has been modified to Rs. 10000 as requested.",
+  "expected": {
+    "eventType": "info"
+  },
+  "messageId": "msg-F14-kotak-limit-change"
+}

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import MoneyAlerts from '../features/finance/components/MoneyAlerts';
 import React, { useState } from 'react';
 import { User, Activity } from '../types';
 import { 
@@ -142,6 +143,8 @@ export default function NotificationsView({
           </button>
         </div>
       </div>
+
+      <MoneyAlerts />
 
       {/* Filter Tabs & Content */}
       <div className="flex flex-col gap-5">

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#4E8F6F"/><stop offset="1" stop-color="#2E4738"/></linearGradient></defs><rect width="512" height="512" fill="url(#g)"/><g transform="translate(256 262) scale(0.78) translate(-256 -262)"><g id="mark">
+  <!-- head with ears -->
+  <path d="M146 214 L132 104 C131 94 141 88 149 94 L222 150 C236 146 247 144 256 144 C265 144 276 146 290 150 L363 94 C371 88 381 94 380 104 L366 214 C381 238 388 262 388 288 C388 360 330 412 256 412 C182 412 124 360 124 288 C124 262 131 238 146 214 Z" fill="#FFFFFF"/>
+  <!-- inner ears -->
+  <path d="M158 132 L206 168 C190 176 176 186 166 198 Z" fill="#F2B8A6"/>
+  <path d="M354 132 L306 168 C322 176 336 186 346 198 Z" fill="#F2B8A6"/>
+  <!-- tabby stripes on the forehead -->
+  <path d="M256 170 C246 170 241 178 242 190 L246 228 C247 236 265 236 266 228 L270 190 C271 178 266 170 256 170 Z" fill="#2F6B52"/>
+  <path d="M206 186 C198 190 197 200 203 208 L222 232 C228 238 240 230 236 222 L222 194 C218 186 212 183 206 186 Z" fill="#2F6B52"/>
+  <path d="M306 186 C314 190 315 200 309 208 L290 232 C284 238 272 230 276 222 L290 194 C294 186 300 183 306 186 Z" fill="#2F6B52"/>
+  <!-- eyes -->
+  <path d="M188 286 C196 266 226 262 238 284 C226 304 200 306 188 286 Z" fill="#2F6B52"/>
+  <path d="M324 286 C316 266 286 262 274 284 C286 304 312 306 324 286 Z" fill="#2F6B52"/>
+  <circle cx="218" cy="282" r="6" fill="#FFFFFF"/>
+  <circle cx="294" cy="282" r="6" fill="#FFFFFF"/>
+  <!-- nose and mouth -->
+  <path d="M244 326 L268 326 C272 326 274 330 271 333 L259 344 C257 346 255 346 253 344 L241 333 C238 330 240 326 244 326 Z" fill="#E07A5F"/>
+  <path d="M256 346 L256 356 M256 356 C250 366 236 366 230 358 M256 356 C262 366 276 366 282 358" stroke="#2F6B52" stroke-width="7" stroke-linecap="round" fill="none"/>
+</g>
+</g></svg>

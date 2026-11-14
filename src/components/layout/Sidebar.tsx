@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Grid, Bell, Settings, Search, X, Plus, UserPlus } from 'lucide-react';
+import { Grid, Bell, Settings, Search, X, Plus, UserPlus, Wallet } from 'lucide-react';
 import AppLogo from '../AppLogo';
+import { FINANCE_TABS } from '../../features/finance/FinanceApp';
 import { useAppStore } from '../../store/useAppStore';
 
 interface SidebarProps {
@@ -11,6 +12,7 @@ interface SidebarProps {
   setIsCreateGroupOpen: (open: boolean) => void;
   setIsAddFriendOpen: (open: boolean) => void;
   setIsSettingsOpen: (open: boolean) => void;
+  onOpenProfile: () => void;
 }
 
 export default function Sidebar({
@@ -20,7 +22,8 @@ export default function Sidebar({
   setActiveView,
   setIsCreateGroupOpen,
   setIsAddFriendOpen,
-  setIsSettingsOpen
+  setIsSettingsOpen,
+  onOpenProfile,
 }: SidebarProps) {
   const currentUser = useAppStore(state => state.currentUser);
   const groups = useAppStore(state => state.groups);
@@ -72,7 +75,7 @@ export default function Sidebar({
       </div>
 
       <div className="flex items-center justify-between py-4 border-b border-[#E6E1DA] mt-2 lg:mt-0">
-        <div className="flex items-center gap-2.5 min-w-0">
+        <button type="button" onClick={onOpenProfile} title="Profile & sign out" className="flex items-center gap-2.5 min-w-0 text-left rounded-xl -m-1 p-1 hover:bg-[#EBF1ED]/60 cursor-pointer" id="sidebar-profile-button">
           <img
             src={currentUser.avatar}
             alt={currentUser.name}
@@ -83,7 +86,7 @@ export default function Sidebar({
             <span className="text-xs font-bold text-[#2C2B29] block truncate">{currentUser.name}</span>
             <span className="text-[10px] text-[#736F6A] block truncate">{currentUser.email}</span>
           </div>
-        </div>
+        </button>
         
         <div className="flex items-center gap-1">
           <button
@@ -145,6 +148,23 @@ export default function Sidebar({
               </span>
             )}
           </button>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold text-[#736F6A] uppercase tracking-wider px-3">Money</span>
+          {FINANCE_TABS.map((t) => {
+            const isActive = activeView.type === 'finance' && activeView.tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => { setActiveView({ type: 'finance', tab: t.id }); setIsMobileMenuOpen(false); }}
+                className={`flex items-center gap-3 px-3 py-1.5 rounded-xl font-semibold text-xs transition-all cursor-pointer ${isActive ? 'bg-[#EBF1ED] text-[#3C5A48]' : 'text-[#736F6A] hover:bg-[#EBF1ED]/50 hover:text-[#2C2B29]'}`}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="relative px-0.5">

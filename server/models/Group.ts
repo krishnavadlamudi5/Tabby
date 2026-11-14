@@ -6,6 +6,12 @@ export interface IGroup extends Document {
   category: string;
   members: string[];
   createdAt: string;
+  // Trip extras (category === 'trip'); optional and additive, so older app
+  // versions that don't send them keep working.
+  startDate?: string | null;
+  endDate?: string | null;
+  budgetPaise?: number | null;
+  currency?: string;
 }
 
 const GroupSchema: Schema = new Schema({
@@ -14,6 +20,10 @@ const GroupSchema: Schema = new Schema({
   category: { type: String, default: 'other' },
   members: { type: [String], default: [], index: true },
   createdAt: { type: String, default: () => new Date().toISOString() },
+  startDate: { type: String, default: null },
+  endDate: { type: String, default: null },
+  budgetPaise: { type: Number, default: null },
+  currency: { type: String, default: 'INR' },
 });
 
 export const Group: Model<IGroup> = (mongoose.models.Group as Model<IGroup>) || mongoose.model<IGroup>('Group', GroupSchema);

@@ -1,0 +1,14 @@
+{
+  "sender": "bankalerts@kotak.bank.in",
+  "subject": "Card online transaction- Successful",
+  "receivedAt": "2026-11-10T08:00:30Z",
+  "bodyText": "Dear Customer,\nYour transaction of Rs.7382.00 on WWW AMAZON IN using Kotak Bank Debit Card XX2797 on 10/11/2026 13:30:10 from your account XX9564 has been processed. The transaction reference No is 631640283074.",
+  "expected": {
+    "eventType": "transaction",
+    "amountPaise": 738200,
+    "referenceIds": [
+      "631640283074"
+    ]
+  },
+  "messageId": "msg-X01-kotak-amazon-debit"
+}

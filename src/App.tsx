@@ -7,7 +7,9 @@ import NotificationsView from './components/NotificationsView';
 
 // Modals
 import ExpenseModal from './components/ExpenseModal';
-import SettingsModal from './components/SettingsModal';
+import ProfileMenu, { SettingsSection } from './components/account/ProfileMenu';
+import SettingsView from './components/account/SettingsView';
+import { usePrefsStore } from './store/usePrefsStore';
 import SettleUpModal from './components/SettleUpModal';
 import AddFriendModal from './components/AddFriendModal';
 import CreateGroupModal from './components/CreateGroupModal';
@@ -17,9 +19,13 @@ import Sidebar from './components/layout/Sidebar';
 import MobileHeader from './components/layout/MobileHeader';
 
 import ToastContainer from './components/ToastContainer';
+import Login from './components/Login';
+import SyncIndicator from './components/SyncIndicator';
+import FinanceApp from './features/finance/FinanceApp';
+import type { FinanceTab } from './features/finance/types';
 
 // Icons & UI
-import { Grid, Users, UserPlus, Bell, Plus, Sparkles, X, Download, RefreshCw } from 'lucide-react';
+import { Grid, Users, UserPlus, Bell, Plus, Sparkles, X, Download, RefreshCw, Wallet } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppStore } from './store/useAppStore';
 import { User, Expense } from './types';
@@ -49,7 +55,9 @@ export default function App() {
     saveExpense,
     deleteExpense,
     settleDebt,
-    simulateAppUpdate
+    simulateAppUpdate,
+    authStatus,
+    signOut,
   } = useAppStore();
 
   // Navigation State
@@ -57,8 +65,12 @@ export default function App() {
     { type: 'dashboard' } | 
     { type: 'group'; id: string } | 
     { type: 'friend'; id: string } |
-    { type: 'notifications' }
+    { type: 'notifications' } |
+    { type: 'finance'; tab: FinanceTab; params?: Record<string, string> } |
+    { type: 'settings'; section?: SettingsSection }
   >({ type: 'dashboard' });
+  const [profileMenu, setProfileMenu] = useState<null | 'left' | 'right'>(null);
+  const openSettings = (section?: SettingsSection) => { setActiveView({ type: 'settings', section }); setIsMobileMenuOpen(false); };
 
   // UI States
   const [isAppUpdateAvailable, setIsAppUpdateAvailable] = useState(false);
@@ -88,7 +100,6 @@ export default function App() {
 
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const [settleModal, setSettleModal] = useState<{
     isOpen: boolean;
@@ -115,17 +126,34 @@ export default function App() {
     }
   }, []);
 
-  // MongoDB Data Sync
+  // Preferences follow the account: load them at sign-in, then open the
+  // preferred start screen and apply the saved currency.
   useEffect(() => {
-    if (!currentUser?.id) return;
-    syncWithBackend(currentUser.id);
+    if (authStatus !== 'signedIn') return;
+    const prefs = usePrefsStore.getState();
+    const goHome = (home?: string) => {
+      if (home === 'money') setActiveView((v) => (v.type === 'dashboard' ? { type: 'finance', tab: 'home' } : v));
+    };
+    goHome(prefs.prefs.homeView);
+    void prefs.load().then(() => {
+      const p = usePrefsStore.getState().prefs;
+      goHome(p.homeView);
+      if (p.currency && p.currency !== useAppStore.getState().currency) setCurrency(p.currency);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus, currentUser?.id]);
+
+  // Server sync (signed-in accounts only; demo mode never talks to the server)
+  useEffect(() => {
+    if (authStatus !== 'signedIn' || !currentUser?.id) return;
+    syncWithBackend();
 
     const interval = setInterval(() => {
-      syncWithBackend(currentUser.id);
+      syncWithBackend();
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [currentUser?.id]);
+  }, [authStatus, currentUser?.id]);
 
   // Selectors
   const myGroups = useMemo(() => {
@@ -179,6 +207,15 @@ export default function App() {
     setSettleModal({ isOpen: true, fromUser, toUser, totalDebt: amount, groupId });
   };
 
+  if (authStatus === 'signedOut') {
+    return (
+      <>
+        <ToastContainer />
+        <Login />
+      </>
+    );
+  }
+
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#F8F5F2] flex items-center justify-center">
@@ -190,6 +227,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#F8F5F2] flex flex-col font-sans text-[#2C2B29] antialiased" id="splitwise-app-root">
       <ToastContainer />
+      <SyncIndicator />
       <AnimatePresence>
         {(showLiveBanner || (isAppUpdateAvailable && showAppUpdateBanner)) && (
           <motion.div 
@@ -269,7 +307,7 @@ export default function App() {
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         activeView={activeView}
         setActiveView={setActiveView}
-        setIsSettingsOpen={setIsSettingsOpen}
+        setIsSettingsOpen={(open: boolean) => open && setProfileMenu('right')}
       />
 
       <div className="flex-1 flex relative">
@@ -280,7 +318,8 @@ export default function App() {
           setActiveView={setActiveView}
           setIsCreateGroupOpen={setIsCreateGroupOpen}
           setIsAddFriendOpen={setIsAddFriendOpen}
-          setIsSettingsOpen={setIsSettingsOpen}
+          setIsSettingsOpen={(open: boolean) => open && openSettings()}
+          onOpenProfile={() => { setIsMobileMenuOpen(false); setProfileMenu('left'); }}
         />
 
         {isMobileMenuOpen && (
@@ -343,6 +382,23 @@ export default function App() {
               />
             )}
 
+            {activeView.type === 'settings' && (
+              <SettingsView
+                section={activeView.section}
+                onBack={() => setActiveView({ type: 'dashboard' })}
+                onNavigateFinance={(tab) => setActiveView({ type: 'finance', tab })}
+                liveUpdate={{ checkForUpdate: checkForLiveUpdate, isUpdateAvailable: isLiveUpdateAvailable, latestVersion: liveLatestVersion, currentVersion: liveCurrentVersion, applyUpdate: applyLiveUpdate, isDownloading: isLiveDownloading }}
+              />
+            )}
+
+            {activeView.type === 'finance' && (
+              <FinanceApp
+                tab={activeView.tab}
+                params={activeView.params}
+                onNavigate={(tab, params) => setActiveView({ type: 'finance', tab, params })}
+              />
+            )}
+
             {activeView.type === 'notifications' && (
               <NotificationsView
                 currentUser={currentUser}
@@ -367,7 +423,7 @@ export default function App() {
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#E6E1DA] px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.5rem)] shadow-lg flex items-center justify-around">
         <button
           onClick={() => { setActiveView({ type: 'dashboard' }); setIsMobileMenuOpen(false); }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${activeView.type === 'dashboard' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${activeView.type === 'dashboard' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
         >
           <div className={`p-1 rounded-lg ${activeView.type === 'dashboard' ? 'bg-[#EBF1ED]' : ''}`}><Grid className="w-5 h-5" /></div>
           <span className="text-[10px] tracking-tight">Dashboard</span>
@@ -379,7 +435,7 @@ export default function App() {
             else if (myGroups.length > 0) setActiveView({ type: 'group', id: myGroups[0].id });
             else setIsCreateGroupOpen(true);
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${activeView.type === 'group' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${activeView.type === 'group' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
         >
           <div className={`p-1 rounded-lg relative ${activeView.type === 'group' ? 'bg-[#EBF1ED]' : ''}`}>
             <Users className="w-5 h-5" />
@@ -409,7 +465,7 @@ export default function App() {
             else if (myFriends.length > 0) setActiveView({ type: 'friend', id: myFriends[0].id });
             else setIsAddFriendOpen(true);
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${activeView.type === 'friend' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${activeView.type === 'friend' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
         >
           <div className={`p-1 rounded-lg relative ${activeView.type === 'friend' ? 'bg-[#EBF1ED]' : ''}`}>
             <UserPlus className="w-5 h-5" />
@@ -419,8 +475,16 @@ export default function App() {
         </button>
 
         <button
+          onClick={() => { setActiveView({ type: 'finance', tab: 'home' }); setIsMobileMenuOpen(false); }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${activeView.type === 'finance' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
+        >
+          <div className={`p-1 rounded-lg ${activeView.type === 'finance' ? 'bg-[#EBF1ED]' : ''}`}><Wallet className="w-5 h-5" /></div>
+          <span className="text-[10px] tracking-tight">Money</span>
+        </button>
+
+        <button
           onClick={() => { setActiveView({ type: 'notifications' }); setIsMobileMenuOpen(false); }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${activeView.type === 'notifications' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
+          className={`flex flex-col items-center gap-0.5 py-1 px-2 rounded-xl transition-all cursor-pointer ${activeView.type === 'notifications' ? 'text-[#3C5A48] font-bold' : 'text-[#736F6A] hover:text-[#2C2B29]'}`}
         >
           <div className={`p-1 rounded-lg relative ${activeView.type === 'notifications' ? 'bg-[#3C5A48] text-white' : ''}`}>
             <Bell className="w-5 h-5" />
@@ -460,23 +524,12 @@ export default function App() {
         onAddFriend={addFriend}
       />
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        currentUser={currentUser}
-        currency={currency}
-        onCurrencyChange={setCurrency}
-        onUpdateProfile={updateProfile}
-        onResetData={resetData}
-        expenses={myExpenses}
-        groups={myGroups}
-        allUsers={users}
-        appVersion={liveCurrentVersion}
-        latestAppVersion={liveLatestVersion}
-        isAppUpdateAvailable={isLiveUpdateAvailable}
-        isDownloadingAppUpdate={isLiveDownloading}
-        onCheckForAppUpdate={checkForLiveUpdate}
-        onApplyAppUpdate={applyLiveUpdate}
+      <ProfileMenu
+        open={profileMenu !== null}
+        align={profileMenu || 'right'}
+        onClose={() => setProfileMenu(null)}
+        onOpenSettings={openSettings}
+        onCheckUpdates={() => openSettings('about')}
       />
 
       <SettleUpModal

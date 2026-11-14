@@ -1,0 +1,12 @@
+{
+  "sender": "bankloanalerts@kotak.bank.in",
+  "subject": "Installment Due Alert",
+  "receivedAt": "2026-11-05T04:00:00Z",
+  "bodyText": "Dear Customer, an Installment of Rs 34098 towards your Kotak Commercial Loan Account No. CSG-12345678 is due on 10-NOV-2026. Please ensure sufficient balance. Kotak Mahindra Bank",
+  "expected": {
+    "eventType": "emi_due",
+    "amountPaise": 3409800,
+    "dueDate": "2026-11-09T18:30:00.000Z"
+  },
+  "messageId": "msg-F11-kotak-emi-due"
+}

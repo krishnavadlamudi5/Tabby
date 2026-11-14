@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Tabby',
   webDir: 'dist',
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
     backgroundColor: '#FAF8F5',
     captureInput: true
   },
