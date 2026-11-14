@@ -281,7 +281,10 @@ export default function Login({ onLogin }: LoginProps) {
 
       const response = await SocialLogin.login({
         provider: 'google',
-        options: { scopes: ['email', 'profile'] }
+        // 'standard' = Android's full "Sign in with Google" dialog: pick an
+        // account, then the permission (consent) screen, then we get an ID
+        // token and log straight in.
+        options: { style: 'standard', scopes: ['email', 'profile'] } as any
       });
 
       const idToken = (response?.result as any)?.idToken;
