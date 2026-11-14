@@ -14,6 +14,33 @@ the roadmap.
 How builds, APKs and in-app OTA updates work:
 [.agents/rules/apk_ota_workflow.md](.agents/rules/apk_ota_workflow.md).
 
+## Money (personal finance)
+
+Under the **Money** tab: one ledger across all your bank accounts and cards,
+built from bank alert emails (pushed from Gmail by a free Apps Script) and
+statements you upload, with categories, budgets, splits, trips, insurance
+policies, an encrypted document vault, EMIs/SIPs/subscriptions and alerts.
+It runs entirely on free tiers and uses no AI: known bank formats are read
+by exact parsers, anything else waits in the review queue.
+
+Code lives in `server/finance/` and `src/features/finance/`. Money is stored
+as integer paise; dates are UTC, business days are India time.
+
+### One-time setup
+
+1. **Render:** set `DATA_ENCRYPTION_KEY` (back it up offline), `INGEST_HMAC_SECRET`,
+   `INGEST_OWNER_EMAIL`, `JOBS_SECRET`, and for documents the `R2_*` variables
+   (see `.env.example`). Optionally `ALLOWED_EMAILS` to restrict Money to you.
+2. **Cloudflare R2:** create a private bucket and an API token scoped to it.
+3. **Gmail:** install `tools/apps-script/Code.gs` (steps in its README), then run
+   `backfill('2026-11-01')`.
+4. **GitHub:** add repository secret `TABBY_JOBS_SECRET` (same as `JOBS_SECRET`) for
+   `.github/workflows/finance-jobs.yml`, and for nightly encrypted backups
+   `MONGODB_URI`, `BACKUP_PASSPHRASE` and the `R2_*` values for `backup.yml`.
+5. **In the app:** Money → Accounts: add every account/card with its last 4
+   digits (and debit card numbers), save statement passwords, upload last
+   month's statement; Money → Insurance: add policies.
+
 ## Run locally
 
 Requires Node.js 22.
@@ -61,6 +88,11 @@ The first `npm test` downloads a MongoDB binary (about 120 MB) from
 
 ## Security notes
 
+- Finance data is scoped to its owner on every query. Documents, email bodies
+  and statement passwords are AES-256-GCM encrypted; email bodies are deleted
+  after 30 days and OTP emails are never stored.
+- The Gmail webhook only accepts HMAC-signed requests less than 5 minutes old;
+  the jobs endpoint needs `JOBS_SECRET`.
 - Every `/api` route except `/api/health` and `/api/auth/google` needs a
   `Bearer` session token, and every query is scoped to the signed-in user.
 - Never put secrets in `VITE_` variables; they are bundled into the app.

@@ -1,0 +1,47 @@
+name: Finance jobs
+
+# Free replacement for a Render Cron Job: calls the API's jobs endpoint.
+# daily  = 08:00 IST (renewal reminders, commitment/refund watch, premium
+#          linking, 30-day email-body purge, alert emails)
+# hourly = every 3 hours (commitment/refund watch + alert emails)
+# Needs repository secret TABBY_JOBS_SECRET (= JOBS_SECRET on Render).
+# Optional repository variable TABBY_API_URL (defaults to the Render API).
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+    - cron: '17 */3 * * *'
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'daily, hourly, or one job name'
+        required: false
+        default: 'daily'
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call jobs endpoint
+        env:
+          JOBS_SECRET: ${{ secrets.TABBY_JOBS_SECRET }}
+          API_URL: ${{ vars.TABBY_API_URL || 'https://tabby-6i0f.onrender.com/api' }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_JOB: ${{ inputs.job }}
+        run: |
+          if [ -z "$JOBS_SECRET" ]; then
+            echo "TABBY_JOBS_SECRET is not set; skipping."
+            exit 0
+          fi
+          job="hourly"
+          if [ "$SCHEDULE" = "30 2 * * *" ]; then job="daily"; fi
+          if [ -n "$INPUT_JOB" ]; then job="$INPUT_JOB"; fi
+          # Wake the free Render instance first (cold start can take ~1 minute).
+          curl -s -o /dev/null --max-time 90 "$API_URL/health" || true
+          curl -fsS --retry 3 --retry-delay 30 --retry-all-errors --max-time 120 \
+            -X POST -H "Authorization: Bearer $JOBS_SECRET" \
+            "$API_URL/finance/jobs/run?job=$job"

@@ -23,6 +23,16 @@ if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGINS) {
   );
 }
 
+// Personal-finance features need these; the shared-expense app runs without them.
+const financeMissing = ['DATA_ENCRYPTION_KEY', 'INGEST_HMAC_SECRET', 'INGEST_OWNER_EMAIL', 'JOBS_SECRET']
+  .filter((k) => !process.env[k]);
+if (financeMissing.length) {
+  console.warn(`Finance: not configured yet (${financeMissing.join(', ')}). See .env.example.`);
+}
+if (!process.env.R2_BUCKET && process.env.NODE_ENV === 'production') {
+  console.warn('Finance: R2 is not configured; uploaded documents would be lost on redeploy.');
+}
+
 async function startServer() {
   await connectDB();
   // Demo users/groups/expenses are only ever written when explicitly asked

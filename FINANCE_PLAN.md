@@ -27,7 +27,13 @@
 >    sources (bank alert vs merchant receipt) and allows an unknown account
 >    on the merchant side; two same-amount payments from one source are never
 >    merged. Fixtures F2/S1 use one consistent amount.
-> 8. **Phase 0 deviations:** the session token is stored in localStorage on
+> 8. **Built with these further choices:** policy details are entered by hand
+>    (no AI extraction); statements accept CSV and text PDFs (not XLSX or
+>    scanned PDFs); scheduled jobs run daily at 08:00 IST and every 3 hours
+>    from `.github/workflows/finance-jobs.yml`; nightly encrypted backups go to
+>    R2 from `.github/workflows/backup.yml`; finance writes are online-only
+>    (the offline outbox covers shared expenses).
+> 9. **Phase 0 deviations:** the session token is stored in localStorage on
 >    both web and Android (Capacitor Preferences would need a new APK);
 >    `user-alex` is demo data only, so nothing was migrated.
 
@@ -501,11 +507,11 @@ POST   /api/finance/jobs/run?job=   (JOBS_SECRET)
 ## 17. Phase checklist (copy into PR descriptions)
 
 - [x] Phase 0 — Auth, data scoping, demo off, reliable sync, hardening, tests
-- [ ] Phase 1 — Finance models, indexes, zod schemas, category seeding
-- [ ] Phase 2 — Apps Script push, ingest route, parsers F1–F16, AI extraction, dedupe/refund/self-transfer, review queue, statements + reconciliation
-- [ ] Phase 3 — Money tab, transactions list/detail, categories & rules, budgets, accounts
-- [ ] Phase 4 — Category split, grocery auto-split, templates, share with friends
-- [ ] Phase 5 — Encrypted storage, policies, claims, documents, tax view
-- [ ] Phase 6 — Trips (dates, budget, linking, summary, export)
-- [ ] Phase 7 — Commitments, Finance Home dashboard, jobs, alerts
-- [ ] Phase 8 — Polish: performance, empty states, backups (Atlas snapshots + export), 12-month history import
+- [x] Phase 1 — Finance models, indexes, zod schemas, category seeding
+- [x] Phase 2 — Apps Script push, ingest route, parsers F1–F16, review queue instead of AI extraction, dedupe/refund/self-transfer, review queue, statements + reconciliation
+- [x] Phase 3 — Money tab, transactions list/detail, categories & rules, budgets, accounts
+- [x] Phase 4 — Category split, grocery auto-split, templates, share with friends
+- [x] Phase 5 — Encrypted storage, policies, claims, documents, tax view
+- [x] Phase 6 — Trips (dates, budget, linking, summary, export)
+- [x] Phase 7 — Commitments, Finance Home dashboard, jobs, alerts
+- [x] Phase 8 — Polish: performance, empty states, backups (Atlas snapshots + export), 12-month history import
