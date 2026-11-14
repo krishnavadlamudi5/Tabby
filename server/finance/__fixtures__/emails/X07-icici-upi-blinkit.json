@@ -1,0 +1,12 @@
+{
+  "sender": "customernotification@icici.bank.in",
+  "subject": "Alert for transaction through ICICI Bank iMobile",
+  "receivedAt": "2026-11-12T12:35:00Z",
+  "bodyText": "Dear Customer,\nUPI payment of ₹764 using the iMobile app to BLINKIT. The payment was initiated from your ICICI bank account XXXXXXXX1042 through transaction ID 631715299001 on Nov 12, 2026.",
+  "expected": {
+    "eventType": "transaction",
+    "amountPaise": 76400,
+    "merchant": "BLINKIT"
+  },
+  "messageId": "msg-X07-icici-upi-blinkit"
+}

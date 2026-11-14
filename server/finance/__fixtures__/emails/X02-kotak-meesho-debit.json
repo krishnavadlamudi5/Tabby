@@ -1,0 +1,12 @@
+{
+  "sender": "bankalerts@kotak.bank.in",
+  "subject": "Card online transaction- Successful",
+  "receivedAt": "2026-11-09T04:16:00Z",
+  "bodyText": "Dear Customer,\nYour transaction of Rs.138.00 on RAZ*Meesho technologies P using Kotak Bank Debit Card XX2797 on 09/11/2026 09:45:40 from your account XX9564 has been processed. The transaction reference No is 631309551870.",
+  "expected": {
+    "eventType": "transaction",
+    "amountPaise": 13800,
+    "merchant": "RAZ*Meesho technologies P"
+  },
+  "messageId": "msg-X02-kotak-meesho-debit"
+}

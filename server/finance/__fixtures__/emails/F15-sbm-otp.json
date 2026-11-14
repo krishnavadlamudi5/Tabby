@@ -1,0 +1,10 @@
+{
+  "sender": "info@sbmbank.co.in",
+  "subject": "SBM NIYO CC - Transaction OTP",
+  "receivedAt": "2026-11-14T10:00:00Z",
+  "bodyText": "Your One Time Password (OTP) for the transaction of INR 499.00 at NETFLIX is 482913. Do not share it with anyone.",
+  "expected": {
+    "detectedType": "otp"
+  },
+  "messageId": "msg-F15-sbm-otp"
+}

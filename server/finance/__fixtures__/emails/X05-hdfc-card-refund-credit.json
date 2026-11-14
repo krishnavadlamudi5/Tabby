@@ -1,0 +1,13 @@
+{
+  "sender": "alerts@hdfcbank.net",
+  "subject": "Refund credited to your HDFC Bank Credit Card",
+  "receivedAt": "2026-11-14T06:00:00Z",
+  "bodyText": "Dear Card Member, a refund of Rs.1099.00 from FLIPKART has been credited to your HDFC Bank Credit Card ending 1830 on 14-11-2026.",
+  "expected": {
+    "eventType": "refund_credit",
+    "amountPaise": 109900,
+    "direction": "credit",
+    "cardHint": "1830"
+  },
+  "messageId": "msg-X05-hdfc-card-refund-credit"
+}

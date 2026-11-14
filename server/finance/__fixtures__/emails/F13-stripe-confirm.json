@@ -1,0 +1,13 @@
+{
+  "sender": "billing+acct_1Xyz@stripe.com",
+  "subject": "Reminder: Confirm your $205.32 payment to Beautiful Slides, Inc.",
+  "receivedAt": "2026-11-08T04:00:00Z",
+  "bodyText": "Confirm your payment\nBeautiful Slides, Inc. needs you to confirm your payment of $205.32.\nConfirm payment",
+  "expected": {
+    "eventType": "subscription",
+    "amountPaise": 20532,
+    "currency": "USD",
+    "commitmentStatus": "action_needed"
+  },
+  "messageId": "msg-F13-stripe-confirm"
+}

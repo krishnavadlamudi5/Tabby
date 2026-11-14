@@ -1,0 +1,19 @@
+{
+  "sender": "customernotification@icici.bank.in",
+  "subject": "Transaction alert: UPI payment made using biometric authentication on iMobile",
+  "receivedAt": "2026-11-14T13:30:00Z",
+  "bodyText": "<html><body><table><tr><td>Dear Customer,</td></tr><tr><td>UPI payment of &#8377;1,320 made using biometric authentication on iMobile.</td></tr><tr><td>Credit Card:</td><td>ICICI Bank Credit Card XXXXXXXXXXXX5002</td></tr><tr><td>Payee:</td><td>VENKATAGIRI RICE AND GENERAL STORES</td></tr><tr><td>Date and Time:</td><td>Nov 14, 2026 , 06:59 PM</td></tr><tr><td>Transaction ID:</td><td>111184394452</td></tr></table></body></html>",
+  "expected": {
+    "eventType": "transaction",
+    "amountPaise": 132000,
+    "direction": "debit",
+    "cardHint": "5002",
+    "merchant": "VENKATAGIRI RICE AND GENERAL STORES",
+    "channel": "upi",
+    "referenceIds": [
+      "111184394452"
+    ],
+    "occurredAt": "2026-11-14T13:29:00.000Z"
+  },
+  "messageId": "msg-F05-icici-upi-creditcard"
+}

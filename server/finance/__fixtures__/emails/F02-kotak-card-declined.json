@@ -1,0 +1,15 @@
+{
+  "sender": "bankalerts@kotak.bank.in",
+  "subject": "Card transaction- declined",
+  "receivedAt": "2026-11-14T15:02:00Z",
+  "bodyText": "Dear Customer,\nThe Kotak Bank Debit Card XX2797 transaction of Rs. 7382.00 at WWW AMAZON IN, on 14/11/2026 20:31:52 is declined as you have exceeded the domestic ECOM limit. To modify limits, login to Kotak app.\nRegards, Kotak Mahindra Bank",
+  "expected": {
+    "eventType": "declined",
+    "amountPaise": 738200,
+    "direction": "debit",
+    "cardHint": "2797",
+    "merchant": "WWW AMAZON IN",
+    "channel": "card"
+  },
+  "messageId": "msg-F02-kotak-card-declined"
+}

@@ -1,0 +1,20 @@
+{
+  "sender": "bankalerts@kotak.bank.in",
+  "subject": "Card online transaction- Successful",
+  "receivedAt": "2026-11-14T13:51:40Z",
+  "bodyText": "Dear Customer,\nYour transaction of Rs.331.00 on FLIPKART PAYMENTS using Kotak Bank Debit Card XX2797 on 14/11/2026 19:21:23 from your account XX9564 has been processed. The transaction reference No is 631813502211.\nIf this transaction was not done by you, please call 18602662666.\nRegards,\nKotak Mahindra Bank",
+  "expected": {
+    "eventType": "transaction",
+    "amountPaise": 33100,
+    "direction": "debit",
+    "cardHint": "2797",
+    "accountHint": "9564",
+    "merchant": "FLIPKART PAYMENTS",
+    "channel": "card",
+    "referenceIds": [
+      "631813502211"
+    ],
+    "occurredAt": "2026-11-14T13:51:23.000Z"
+  },
+  "messageId": "msg-F01-kotak-card-success"
+}

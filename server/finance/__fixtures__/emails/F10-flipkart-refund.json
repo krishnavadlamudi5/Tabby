@@ -1,0 +1,18 @@
+{
+  "sender": "no-reply@rmt.flipkart.com",
+  "subject": "The refund amount for your Philips trimmer is successfully transferred to your card",
+  "receivedAt": "2026-11-10T06:00:00Z",
+  "bodyText": "<div><p>Hi Test,</p><p>Refund amount</p><p>&#8360;. 1099.0</p><p>Bank name</p><p>HDFC</p><p>Card number</p><p>************1830</p><p>The amount will be added to your card by Nov 16, 2026.</p><p>Order ID OD330121789922014100</p></div>",
+  "expected": {
+    "eventType": "expected_refund",
+    "amountPaise": 109900,
+    "direction": "credit",
+    "cardHint": "1830",
+    "institution": "hdfc",
+    "referenceIds": [
+      "OD330121789922014100"
+    ],
+    "expectedAt": "2026-11-15T18:30:00.000Z"
+  },
+  "messageId": "msg-F10-flipkart-refund"
+}

@@ -1,0 +1,10 @@
+{
+  "sender": "offers@paymentsapp.example",
+  "subject": "Pay Your Bills & Get ₹50 Cashback!",
+  "receivedAt": "2026-11-14T10:00:00Z",
+  "bodyText": "Pay your electricity bill today and get ₹50 cashback. Limited period offer. T&C apply. Unsubscribe",
+  "expected": {
+    "detectedType": "marketing"
+  },
+  "messageId": "msg-F16-marketing"
+}

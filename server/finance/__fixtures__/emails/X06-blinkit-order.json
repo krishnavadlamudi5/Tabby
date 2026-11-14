@@ -1,0 +1,12 @@
+{
+  "sender": "noreply@blinkit.com",
+  "subject": "Your Blinkit order summary",
+  "receivedAt": "2026-11-12T12:40:00Z",
+  "bodyText": "Order ID: 1784512398\nItems in this order\nTomato (Hybrid) 500 g x 1 ₹32\nOnion 1 kg x 1 ₹45\nAmul Taaza Toned Milk 500 ml x 2 ₹56\nAashirvaad Shudh Chakki Atta 5 kg x 1 ₹285\nTata Sampann Toor Dal 1 kg x 1 ₹189\nLays Classic Salted 52 g x 2 ₹40\nVim Dishwash Liquid 500 ml x 1 ₹115\nItem total ₹762\nHandling charge ₹2\nGrand total ₹764",
+  "expected": {
+    "eventType": "order",
+    "amountPaise": 76400,
+    "merchant": "Blinkit"
+  },
+  "messageId": "msg-X06-blinkit-order"
+}

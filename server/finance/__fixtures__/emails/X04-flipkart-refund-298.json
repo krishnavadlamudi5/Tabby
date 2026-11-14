@@ -1,0 +1,11 @@
+{
+  "sender": "no-reply@rmt.flipkart.com",
+  "subject": "The refund amount for your phone cover is successfully transferred to your card",
+  "receivedAt": "2026-11-10T06:30:00Z",
+  "bodyText": "Refund amount ₨. 298.0 Bank name HDFC Card number ************1830 The amount will be added to your card by Nov 16, 2026. Order ID OD330121789922099900",
+  "expected": {
+    "eventType": "expected_refund",
+    "amountPaise": 29800
+  },
+  "messageId": "msg-X04-flipkart-refund-298"
+}

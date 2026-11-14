@@ -1,0 +1,12 @@
+{
+  "sender": "noreply-coin@qmailer.zerodha.net",
+  "subject": "Coin by Zerodha - Order report",
+  "receivedAt": "2026-11-06T04:00:00Z",
+  "bodyText": "Hi Test,\nOrder failed\nQUANT ELSS TAX SAVER FUND DIRECT PLAN - GROWTH\nPayment not initiated from client end\nOrder value: ₹5000.0000\nTeam Zerodha",
+  "expected": {
+    "eventType": "sip_report",
+    "amountPaise": 500000,
+    "commitmentStatus": "failed"
+  },
+  "messageId": "msg-F12-zerodha-sip-failed"
+}

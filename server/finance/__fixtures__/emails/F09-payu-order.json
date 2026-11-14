@@ -1,0 +1,18 @@
+{
+  "sender": "payment-report@payu.in",
+  "subject": "Your Order at PRATYAYA is successful",
+  "receivedAt": "2026-11-12T10:00:00Z",
+  "bodyText": "Dear Customer, you have successfully completed a payment of Rs. 2752.00 to PRATYAYA E-COMMERCE PRIVATE LIMITED. Transaction Id: 22749631812 Payment Mode upi Thank you, PayU",
+  "expected": {
+    "eventType": "transaction",
+    "amountPaise": 275200,
+    "direction": "debit",
+    "merchant": "PRATYAYA E-COMMERCE PRIVATE LIMITED",
+    "channel": "upi",
+    "sourceKind": "merchant",
+    "referenceIds": [
+      "22749631812"
+    ]
+  },
+  "messageId": "msg-F09-payu-order"
+}

@@ -1,0 +1,17 @@
+{
+  "sender": "BankAlerts@kotak.com",
+  "subject": "Notification regarding your recent transaction",
+  "receivedAt": "2026-11-15T05:00:00Z",
+  "bodyText": "Dear Customer,\nThe amount of Rs. 7382.00 has been credited to your Kotak Bank Account XXXXXX9564 against your recent Debit Card transaction with RRN 631640283074.\nRegards,\nKotak Mahindra Bank",
+  "expected": {
+    "eventType": "refund_credit",
+    "amountPaise": 738200,
+    "direction": "credit",
+    "accountHint": "9564",
+    "referenceIds": [
+      "631640283074"
+    ],
+    "channel": "card"
+  },
+  "messageId": "msg-F03-kotak-reversal-credit"
+}

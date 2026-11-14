@@ -1,0 +1,22 @@
+{
+  "sender": "bankalerts@kotak.bank.in",
+  "subject": "IMPS Debit Transaction-Success",
+  "receivedAt": "2026-11-02T06:10:00Z",
+  "bodyText": "Dear Customer,\nyour Account xx9564 is debited for Rs. 75000.00 on 02-Nov-2026 towards IMPS transaction.\nBeneficiary Name: TEST OWNER\nBeneficiary Account No: XXXXXXXX1537\nBeneficiary IFSC: ICIC0002386\nIMPS Reference No: 630609288146\nRegards, Kotak Mahindra Bank",
+  "expected": {
+    "eventType": "transaction",
+    "amountPaise": 7500000,
+    "direction": "debit",
+    "accountHint": "9564",
+    "channel": "imps",
+    "referenceIds": [
+      "630609288146"
+    ],
+    "counterparty": {
+      "name": "TEST OWNER",
+      "account": "1537",
+      "ifsc": "ICIC0002386"
+    }
+  },
+  "messageId": "msg-F04-kotak-imps-self"
+}

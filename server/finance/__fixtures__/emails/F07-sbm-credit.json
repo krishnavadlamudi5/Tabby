@@ -1,0 +1,13 @@
+{
+  "sender": "info@sbmbank.co.in",
+  "subject": "Credit Transaction Alert",
+  "receivedAt": "2026-11-01T04:00:00Z",
+  "bodyText": "Dear Customer, Your account XX7255 is credited with INR 12.00 on 01-Nov-2026. Available balance is INR 1,512.00. - SBM Bank India",
+  "expected": {
+    "eventType": "transaction",
+    "amountPaise": 1200,
+    "direction": "credit",
+    "accountHint": "7255"
+  },
+  "messageId": "msg-F07-sbm-credit"
+}

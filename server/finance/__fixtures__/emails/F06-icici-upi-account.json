@@ -1,0 +1,18 @@
+{
+  "sender": "customernotification@icici.bank.in",
+  "subject": "Alert for transaction through ICICI Bank iMobile",
+  "receivedAt": "2026-11-13T05:00:00Z",
+  "bodyText": "Dear Customer,\nUPI payment of ₹10 using the iMobile app to SRI PRASAD MEDICALS. The payment was initiated from your ICICI bank account XXXXXXXX1042 through transaction ID 631715233016 on Nov 13, 2026.\nRegards, ICICI Bank",
+  "expected": {
+    "eventType": "transaction",
+    "amountPaise": 1000,
+    "direction": "debit",
+    "accountHint": "1042",
+    "merchant": "SRI PRASAD MEDICALS",
+    "channel": "upi",
+    "referenceIds": [
+      "631715233016"
+    ]
+  },
+  "messageId": "msg-F06-icici-upi-account"
+}

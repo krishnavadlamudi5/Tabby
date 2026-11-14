@@ -12,6 +12,7 @@ import activityRoutes from './routes/activities';
 import syncRoutes from './routes/sync';
 import receiptRoutes from './routes/receipt';
 import financeRoutes from './finance/routes';
+import { emailIngestRouter } from './finance/routes/ingest';
 
 // ---------------------------------------------------------------------------
 // CORS allowlist
@@ -71,6 +72,9 @@ export function createApp() {
     },
     credentials: false, // Bearer tokens are sent explicitly, not via cookies.
   }));
+  // Gmail push webhook: HMAC-signed, needs the raw body and a 25 MB limit,
+  // so it is mounted before the app-wide JSON parser (see routes/ingest.ts).
+  app.use('/api/finance/ingest/email', emailIngestRouter);
   app.use(express.json({ limit: '10mb' }));
 
   // Global per-IP limit for every API route. Individual routes (receipt scan,

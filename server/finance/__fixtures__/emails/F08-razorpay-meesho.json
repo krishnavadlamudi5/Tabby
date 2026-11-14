@@ -1,0 +1,19 @@
+{
+  "sender": "no-reply@razorpay.com",
+  "subject": "Payment successful for Meesho technologies Pvt Ltd",
+  "receivedAt": "2026-11-09T04:16:10Z",
+  "bodyText": "Meesho technologies Pvt Ltd\n₹138.00\nPaid Successfully\nPayment Id pay_Rt8KxQ2mZr1aB9\nMethod card\nPaid On 09 Nov, 2026 09:45:43 AM IST\nEmail test@example.com",
+  "expected": {
+    "eventType": "transaction",
+    "amountPaise": 13800,
+    "direction": "debit",
+    "merchant": "Meesho technologies Pvt Ltd",
+    "channel": "card",
+    "referenceIds": [
+      "pay_Rt8KxQ2mZr1aB9"
+    ],
+    "sourceKind": "merchant",
+    "occurredAt": "2026-11-09T04:15:43.000Z"
+  },
+  "messageId": "msg-F08-razorpay-meesho"
+}
