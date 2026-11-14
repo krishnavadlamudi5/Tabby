@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'crypto';
+import { User } from '../models/User';
 
 const TOKEN_TTL = '30d';
 
@@ -12,6 +13,8 @@ export interface AuthedRequest extends Request {
 interface TokenPayload {
   sub: string;
   email?: string;
+  /** User.tokenVersion when issued (absent on older tokens = 0). */
+  v?: number;
 }
 
 // Read lazily (not at import time) so tests and scripts can set the env first.
@@ -37,8 +40,8 @@ export function assertAuthConfigured(): void {
 }
 
 /** Issues a signed 30-day session token for an internal user id. */
-export function signToken(userId: string, email?: string): string {
-  const payload: TokenPayload = { sub: userId };
+export function signToken(userId: string, email?: string, version = 0): string {
+  const payload: TokenPayload = { sub: userId, v: version };
   if (email) payload.email = email;
   return jwt.sign(payload, jwtSecret(), { expiresIn: TOKEN_TTL });
 }
@@ -57,18 +60,30 @@ export function requireAuth(req: AuthedRequest, res: Response, next: NextFunctio
     return;
   }
 
+  let payload: TokenPayload;
   try {
-    const payload = jwt.verify(token, jwtSecret()) as TokenPayload;
-    if (!payload?.sub) {
-      res.status(401).json({ error: 'Invalid session. Please sign in again.' });
-      return;
-    }
-    req.userId = payload.sub;
-    req.userEmail = payload.email;
-    next();
+    payload = jwt.verify(token, jwtSecret()) as TokenPayload;
   } catch {
     res.status(401).json({ error: 'Session expired. Please sign in again.' });
+    return;
   }
+  if (!payload?.sub) {
+    res.status(401).json({ error: 'Invalid session. Please sign in again.' });
+    return;
+  }
+  // The account must still exist and the token must not predate a
+  // "sign out of all devices".
+  User.findOne({ id: payload.sub }, { tokenVersion: 1 }).lean()
+    .then((user: any) => {
+      if (!user || (user.tokenVersion || 0) !== (payload.v || 0)) {
+        res.status(401).json({ error: 'You were signed out. Please sign in again.' });
+        return;
+      }
+      req.userId = payload.sub;
+      req.userEmail = payload.email;
+      next();
+    })
+    .catch(() => res.status(503).json({ error: 'Please try again in a moment.' }));
 }
 
 /**

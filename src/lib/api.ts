@@ -121,6 +121,29 @@ export async function signInWithGoogleApi(idToken: string): Promise<{ token: str
   return { token: data.token, user: data.user };
 }
 
+export async function logoutAllApi(): Promise<void> {
+  await request('/auth/logout-all', { method: 'POST', body: '{}' });
+}
+
+// --- Preferences (synced across devices) ---------------------------------
+
+export type AlertChannel = 'off' | 'app' | 'email';
+export interface Preferences {
+  homeView?: 'dashboard' | 'money';
+  reportBasis?: 'fy' | 'calendar';
+  currency?: string;
+  largeDebitPaise?: number | null;
+  alerts?: Partial<Record<string, AlertChannel>>;
+}
+
+export async function getPreferencesApi(): Promise<Preferences> {
+  return (await request<{ preferences: Preferences }>('/users/me/preferences')).preferences || {};
+}
+
+export async function savePreferencesApi(p: Preferences): Promise<Preferences> {
+  return (await request<{ preferences: Preferences }>('/users/me/preferences', { method: 'PUT', body: JSON.stringify(p) })).preferences || {};
+}
+
 // --- Writes ------------------------------------------------------------
 // These throw ApiError on failure. Callers go through the outbox
 // (src/lib/outbox.ts), which retries transient failures.

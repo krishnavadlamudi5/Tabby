@@ -96,7 +96,7 @@ type BtnVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export function Button({
   children, onClick, variant = 'primary', size = 'md', disabled, type = 'button', className = '', busy,
 }: {
-  children: React.ReactNode; onClick?: () => void; variant?: BtnVariant; size?: 'sm' | 'md'; disabled?: boolean;
+  key?: string; children: React.ReactNode; onClick?: () => void; variant?: BtnVariant; size?: 'sm' | 'md'; disabled?: boolean;
   type?: 'button' | 'submit'; className?: string; busy?: boolean;
 }) {
   const styles: Record<BtnVariant, string> = {

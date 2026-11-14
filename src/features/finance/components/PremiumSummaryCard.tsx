@@ -4,6 +4,7 @@ import { financeApi } from '../api';
 import { Card, SectionTitle, Spinner, useAsync } from './ui';
 import { formatPaise } from '../../../utils/currency';
 import { downloadCSV } from '../../../utils/export';
+import { usePrefsStore } from '../../../store/usePrefsStore';
 
 const TYPE_LABEL: Record<string, string> = {
   health: 'Health', term_life: 'Term life', life: 'Life', vehicle: 'Vehicle', home: 'Home', travel: 'Travel', personal_accident: 'Personal accident', other: 'Other',
@@ -14,7 +15,7 @@ const TYPE_LABEL: Record<string, string> = {
  * and by person, plus a policy × year table to compare years.
  */
 export default function PremiumSummaryCard({ refreshKey }: { refreshKey: number }) {
-  const [basis, setBasis] = useState<'fy' | 'calendar'>('fy');
+  const [basis, setBasis] = useState<'fy' | 'calendar'>(usePrefsStore.getState().prefs.reportBasis || 'fy');
   const { data, loading } = useAsync(() => financeApi.premiumSummary(basis, 4), [basis, refreshKey]);
   const [year, setYear] = useState<string | null>(null);
   if (loading && !data) return <Card><Spinner /></Card>;

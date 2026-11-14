@@ -11,6 +11,7 @@ interface SidebarProps {
   setIsCreateGroupOpen: (open: boolean) => void;
   setIsAddFriendOpen: (open: boolean) => void;
   setIsSettingsOpen: (open: boolean) => void;
+  onOpenProfile: () => void;
 }
 
 export default function Sidebar({
@@ -20,7 +21,8 @@ export default function Sidebar({
   setActiveView,
   setIsCreateGroupOpen,
   setIsAddFriendOpen,
-  setIsSettingsOpen
+  setIsSettingsOpen,
+  onOpenProfile,
 }: SidebarProps) {
   const currentUser = useAppStore(state => state.currentUser);
   const groups = useAppStore(state => state.groups);
@@ -72,7 +74,7 @@ export default function Sidebar({
       </div>
 
       <div className="flex items-center justify-between py-4 border-b border-[#E6E1DA] mt-2 lg:mt-0">
-        <div className="flex items-center gap-2.5 min-w-0">
+        <button type="button" onClick={onOpenProfile} title="Profile & sign out" className="flex items-center gap-2.5 min-w-0 text-left rounded-xl -m-1 p-1 hover:bg-[#EBF1ED]/60 cursor-pointer" id="sidebar-profile-button">
           <img
             src={currentUser.avatar}
             alt={currentUser.name}
@@ -83,7 +85,7 @@ export default function Sidebar({
             <span className="text-xs font-bold text-[#2C2B29] block truncate">{currentUser.name}</span>
             <span className="text-[10px] text-[#736F6A] block truncate">{currentUser.email}</span>
           </div>
-        </div>
+        </button>
         
         <div className="flex items-center gap-1">
           <button

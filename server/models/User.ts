@@ -16,6 +16,19 @@ export interface IUser extends Document {
   avatar?: string;
   friendIds: string[];
   createdAt: string;
+  /** Bumped by "sign out of all devices": tokens with an older version stop working. */
+  tokenVersion: number;
+  preferences: UserPreferences;
+}
+
+export type AlertChannel = 'off' | 'app' | 'email';
+export interface UserPreferences {
+  homeView?: 'dashboard' | 'money';
+  reportBasis?: 'fy' | 'calendar';
+  currency?: string;
+  largeDebitPaise?: number;
+  /** Per alert group: off / in-app only / in-app + email. */
+  alerts?: Partial<Record<string, AlertChannel>>;
 }
 
 const UserSchema: Schema = new Schema({
@@ -31,6 +44,8 @@ const UserSchema: Schema = new Schema({
   avatar: { type: String, default: '' },
   friendIds: { type: [String], default: [] },
   createdAt: { type: String, default: () => new Date().toISOString() },
+  tokenVersion: { type: Number, default: 0 },
+  preferences: { type: Schema.Types.Mixed, default: () => ({}) },
 });
 
 // Never serialise the password hash, even on documents where it was loaded
@@ -38,6 +53,7 @@ const UserSchema: Schema = new Schema({
 UserSchema.set('toJSON', {
   transform(_doc: unknown, ret: Record<string, any>) {
     delete ret.password;
+    delete ret.tokenVersion;
     return ret;
   },
 });

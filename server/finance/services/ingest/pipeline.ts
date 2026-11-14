@@ -42,7 +42,8 @@ export interface IngestResult {
   transactionIds: string[];
 }
 
-export function largeDebitThresholdPaise(): number {
+export function largeDebitThresholdPaise(ownerPref?: number | null): number {
+  if (typeof ownerPref === 'number' && ownerPref > 0) return ownerPref;
   return Number(process.env.FINANCE_LARGE_DEBIT_PAISE) || 25_000_00;
 }
 
@@ -291,7 +292,7 @@ async function applyMoneyEvent(ownerId: string, raw: IRawEvent, ext: Extraction,
       const refund = await findEarlierRefund(txn);
       if (refund) await linkPair(refund, txn);
     }
-    if (kind === 'expense' && amountPaise >= largeDebitThresholdPaise()) {
+    if (kind === 'expense' && amountPaise >= largeDebitThresholdPaise((owner as any)?.preferences?.largeDebitPaise)) {
       await raiseAlert(ownerId, {
         type: 'large_debit', title: `Large payment: ${formatPaiseINR(amountPaise)}${txn.merchant ? ` to ${txn.merchant}` : ''}`,
         entity: { kind: 'transaction', id: String(txn._id) }, dedupeKey: `large-debit:${txn._id}`, email: true,

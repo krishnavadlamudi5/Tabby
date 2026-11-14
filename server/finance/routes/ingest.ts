@@ -6,7 +6,9 @@ import { Account, FinDocument, IAccount, RawEvent, Transaction } from '../models
 import { handler, scoped, validate } from '../lib/http';
 import { emailIngest, manualIngest } from '../validation/schemas';
 import { ingestEmail } from '../services/ingest/pipeline';
-import { sha256, decryptString } from '../lib/crypto';
+import { sha256, decryptString, isEncryptionConfigured } from '../lib/crypto';
+import { getFileStore } from '../services/storage/fileStore';
+import { isAiConfigured } from '../services/ai/cloudflare';
 import { saveDocument } from '../services/storage/documents';
 import { parsePdfStatement, StatementParseError } from '../services/statements/parse';
 import { importStatement } from '../services/statements/importStatement';
@@ -35,6 +37,36 @@ manualIngestRouter.post('/', handler(async (req, res) => {
   res.status(result.duplicate ? 409 : 200).json({
     success: !result.duplicate, ...result, ...(policy ? { status: 'parsed', policyId: String(policy._id) } : {}),
     ...(result.duplicate ? { error: 'already_ingested' } : {}),
+  });
+}));
+
+// GET /api/finance/ingest/status - is the Gmail import working?
+manualIngestRouter.get('/status', handler(async (req, res) => {
+  const owner = scoped(req);
+  const weekAgo = new Date(Date.now() - 7 * 86_400_000);
+  const [last, week, review, total] = await Promise.all([
+    RawEvent.findOne({ ...owner, source: 'gmail' }).sort({ createdAt: -1 }),
+    RawEvent.countDocuments({ ...owner, source: 'gmail', createdAt: { $gte: weekAgo } }),
+    RawEvent.countDocuments({ ...owner, status: 'needs_review' }),
+    RawEvent.countDocuments({ ...owner, source: 'gmail' }),
+  ]);
+  const user = await User.findOne({ id: req.userId });
+  const ownerEmail = (process.env.INGEST_OWNER_EMAIL || '').toLowerCase().trim();
+  res.json({
+    success: true,
+    configured: Boolean(process.env.INGEST_HMAC_SECRET),
+    isIngestOwner: Boolean(ownerEmail && user && user.email === ownerEmail),
+    lastReceivedAt: last?.createdAt || null,
+    lastSubject: last?.subject || null,
+    emailsThisWeek: week,
+    emailsTotal: total,
+    needsReview: review,
+    features: {
+      encryption: isEncryptionConfigured(),
+      documentsStorage: getFileStore().name,
+      aiBackup: isAiConfigured(),
+      alertEmails: Boolean(process.env.RESEND_API_KEY),
+    },
   });
 }));
 

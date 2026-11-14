@@ -22,6 +22,7 @@ import { formatAmount } from '../utils/currency';
 import { getDemoInitialData } from '../data/demoData';
 import { useToastStore } from './useToastStore';
 import { useFinanceStore } from '../features/finance/store';
+import { usePrefsStore } from './usePrefsStore';
 
 /**
  * - loading:   restoring a saved session
@@ -253,6 +254,7 @@ export const useAppStore = create<AppState>((set, get) => {
       void nativeGoogleSignOut();
       webGoogleSignOut();
       useFinanceStore.getState().reset();
+      usePrefsStore.getState().reset();
       set({
         authStatus: 'signedOut',
         currentUser: null,

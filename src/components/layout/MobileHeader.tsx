@@ -74,7 +74,8 @@ export default function MobileHeader({
           onClick={() => setIsSettingsOpen(true)}
           className="p-0.5 rounded-full bg-gradient-to-tr from-emerald-400 to-teal-500 hover:scale-105 transition-all duration-300 cursor-pointer shadow-md group"
           type="button"
-          title="Settings & Profile"
+          title="Profile, settings & sign out"
+          aria-label="Open profile menu"
         >
           <img
             src={currentUser.avatar}

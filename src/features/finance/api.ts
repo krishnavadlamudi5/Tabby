@@ -66,6 +66,7 @@ export const financeApi = {
   ignoreSender: (id: string) => apiRequest(`${F}/review/${id}/ignore-sender`, { method: 'POST', body: {} }),
   ruleFromReview: (id: string, body: Record<string, unknown>) => apiRequest(`${F}/review/${id}/rule`, { method: 'POST', body }),
 
+  ingestStatus: () => apiRequest<{ configured: boolean; isIngestOwner: boolean; lastReceivedAt: string | null; lastSubject: string | null; emailsThisWeek: number; emailsTotal: number; needsReview: number; features: { encryption: boolean; documentsStorage: string; aiBackup: boolean; alertEmails: boolean } }>(`${F}/ingest/status`),
   ingestManual: (body: Record<string, unknown>) => apiRequest<{ status: string; reviewReason?: string; transactionIds: string[]; detectedType: string }>(`${F}/ingest/manual`, { method: 'POST', body }),
 
   policies: () => apiRequest<{ policies: Policy[] }>(`${F}/policies`),

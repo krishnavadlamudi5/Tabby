@@ -6,6 +6,7 @@ import { Button, Card, ErrorBlock, SectionTitle, Spinner, useAsync } from '../co
 import { formatPaise } from '../../../utils/currency';
 import { downloadCSV } from '../../../utils/export';
 import type { FinanceTab } from '../types';
+import { usePrefsStore } from '../../../store/usePrefsStore';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthName = (key: string) => MONTHS[Number(key.slice(5, 7)) - 1];
@@ -17,8 +18,9 @@ function currentYear(basis: 'fy' | 'calendar'): number {
 
 /** Year view: spend by month and by category, compared with earlier years. */
 export default function Reports({ onNavigate }: { onNavigate: (tab: FinanceTab, params?: Record<string, string>) => void }) {
-  const [basis, setBasis] = useState<'fy' | 'calendar'>('fy');
-  const [year, setYear] = useState(currentYear('fy'));
+  const preferred = usePrefsStore.getState().prefs.reportBasis || 'fy';
+  const [basis, setBasis] = useState<'fy' | 'calendar'>(preferred);
+  const [year, setYear] = useState(currentYear(preferred));
   const { data, error, loading, reload } = useAsync(() => financeApi.yearReport(year, basis), [year, basis]);
   const maxYear = currentYear(basis);
 

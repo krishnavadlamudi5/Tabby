@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { randomBytes } from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { User } from '../models/User';
-import { signToken } from '../middleware/auth';
+import { signToken, requireAuth, AuthedRequest } from '../middleware/auth';
 import { DEMO_USERS_SEED } from '../seedDemo';
 import { ensureDefaultCategories } from '../finance/services/categories';
 
@@ -131,12 +131,19 @@ router.post('/google', googleLimiter, async (req: Request, res: Response): Promi
       console.warn('Category seeding failed:', err);
     }
 
-    const token = signToken(user.id, email);
+    const token = signToken(user.id, email, user.tokenVersion || 0);
     res.json({ success: true, token, user: user.toJSON() });
   } catch (err: any) {
     console.error('Google sign-in error:', err);
     res.status(500).json({ error: 'Sign-in failed. Please try again.' });
   }
+});
+
+// POST /api/auth/logout-all - invalidates every session of this account
+// (lost phone, shared computer). The caller signs in again afterwards.
+router.post('/logout-all', requireAuth, async (req: AuthedRequest, res: Response): Promise<void> => {
+  await User.updateOne({ id: req.userId }, { $inc: { tokenVersion: 1 } });
+  res.json({ success: true });
 });
 
 export default router;

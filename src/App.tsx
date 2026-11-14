@@ -7,7 +7,9 @@ import NotificationsView from './components/NotificationsView';
 
 // Modals
 import ExpenseModal from './components/ExpenseModal';
-import SettingsModal from './components/SettingsModal';
+import ProfileMenu, { SettingsSection } from './components/account/ProfileMenu';
+import SettingsView from './components/account/SettingsView';
+import { usePrefsStore } from './store/usePrefsStore';
 import SettleUpModal from './components/SettleUpModal';
 import AddFriendModal from './components/AddFriendModal';
 import CreateGroupModal from './components/CreateGroupModal';
@@ -64,8 +66,11 @@ export default function App() {
     { type: 'group'; id: string } | 
     { type: 'friend'; id: string } |
     { type: 'notifications' } |
-    { type: 'finance'; tab: FinanceTab; params?: Record<string, string> }
+    { type: 'finance'; tab: FinanceTab; params?: Record<string, string> } |
+    { type: 'settings'; section?: SettingsSection }
   >({ type: 'dashboard' });
+  const [profileMenu, setProfileMenu] = useState<null | 'left' | 'right'>(null);
+  const openSettings = (section?: SettingsSection) => { setActiveView({ type: 'settings', section }); setIsMobileMenuOpen(false); };
 
   // UI States
   const [isAppUpdateAvailable, setIsAppUpdateAvailable] = useState(false);
@@ -83,6 +88,7 @@ export default function App() {
     showBanner: showLiveBanner,
     applyUpdate: applyLiveUpdate,
     dismissUpdate: dismissLiveUpdate,
+    checkForUpdate: checkLiveUpdate,
   } = useLiveUpdate();
 
   // Modal States
@@ -93,7 +99,6 @@ export default function App() {
 
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const [settleModal, setSettleModal] = useState<{
     isOpen: boolean;
@@ -119,6 +124,23 @@ export default function App() {
       console.error('Failed to initialize app state', e);
     }
   }, []);
+
+  // Preferences follow the account: load them at sign-in, then open the
+  // preferred start screen and apply the saved currency.
+  useEffect(() => {
+    if (authStatus !== 'signedIn') return;
+    const prefs = usePrefsStore.getState();
+    const goHome = (home?: string) => {
+      if (home === 'money') setActiveView((v) => (v.type === 'dashboard' ? { type: 'finance', tab: 'home' } : v));
+    };
+    goHome(prefs.prefs.homeView);
+    void prefs.load().then(() => {
+      const p = usePrefsStore.getState().prefs;
+      goHome(p.homeView);
+      if (p.currency && p.currency !== useAppStore.getState().currency) setCurrency(p.currency);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus, currentUser?.id]);
 
   // Server sync (signed-in accounts only; demo mode never talks to the server)
   useEffect(() => {
@@ -284,7 +306,7 @@ export default function App() {
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         activeView={activeView}
         setActiveView={setActiveView}
-        setIsSettingsOpen={setIsSettingsOpen}
+        setIsSettingsOpen={(open: boolean) => open && setProfileMenu('right')}
       />
 
       <div className="flex-1 flex relative">
@@ -295,7 +317,8 @@ export default function App() {
           setActiveView={setActiveView}
           setIsCreateGroupOpen={setIsCreateGroupOpen}
           setIsAddFriendOpen={setIsAddFriendOpen}
-          setIsSettingsOpen={setIsSettingsOpen}
+          setIsSettingsOpen={(open: boolean) => open && openSettings()}
+          onOpenProfile={() => { setIsMobileMenuOpen(false); setProfileMenu('left'); }}
         />
 
         {isMobileMenuOpen && (
@@ -355,6 +378,15 @@ export default function App() {
                 onEditExpense={handleOpenEditExpense}
                 onDeleteExpense={deleteExpense}
                 onSettleDebt={handleOpenSettleModal}
+              />
+            )}
+
+            {activeView.type === 'settings' && (
+              <SettingsView
+                section={activeView.section}
+                onBack={() => setActiveView({ type: 'dashboard' })}
+                onNavigateFinance={(tab) => setActiveView({ type: 'finance', tab })}
+                liveUpdate={{ checkForUpdate: checkLiveUpdate, isUpdateAvailable: isLiveUpdateAvailable, latestVersion: liveLatestVersion, applyUpdate: applyLiveUpdate, isDownloading: isLiveDownloading }}
               />
             )}
 
@@ -491,23 +523,12 @@ export default function App() {
         onAddFriend={addFriend}
       />
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        currentUser={currentUser}
-        currency={currency}
-        onCurrencyChange={setCurrency}
-        onUpdateProfile={updateProfile}
-        onResetData={resetData}
-        onSignOut={() => {
-          setIsSettingsOpen(false);
-          setActiveView({ type: 'dashboard' });
-          signOut();
-        }}
-        isDemo={authStatus === 'demo'}
-        expenses={myExpenses}
-        groups={myGroups}
-        allUsers={users}
+      <ProfileMenu
+        open={profileMenu !== null}
+        align={profileMenu || 'right'}
+        onClose={() => setProfileMenu(null)}
+        onOpenSettings={openSettings}
+        onCheckUpdates={() => { void checkLiveUpdate(true); }}
       />
 
       <SettleUpModal

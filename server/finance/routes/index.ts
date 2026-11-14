@@ -27,6 +27,7 @@ router.use('/transactions', transactionsRouter);
 router.use('/review', reviewRouter);
 router.use('/statements', statementsRouter);
 router.use('/ingest/manual', manualIngestRouter);
+router.use('/ingest', manualIngestRouter);
 router.use('/documents', documentsRouter);
 router.use('/policies', policiesRouter);
 router.use('/people', peopleRouter);
