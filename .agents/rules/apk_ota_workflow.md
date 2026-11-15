@@ -10,8 +10,8 @@
 ## 1. System Architecture Overview
 
 * **Backend Service (Live API):**
-  * Hosted on **Render**: `https://tabby-6i0f.onrender.com`
-  * API Base: `https://tabby-6i0f.onrender.com/api`
+  * Hosted on **Render**: `https://tabby-api-bpb4.onrender.com`
+  * API Base: `https://tabby-api-bpb4.onrender.com/api`
   * Database: **MongoDB Atlas** (Whitelisted `0.0.0.0/0`)
   * Environment variables required on Render: `MONGODB_URI`, `RESEND_API_KEY`.
 
@@ -32,7 +32,7 @@ The repository uses two automated GitHub Actions workflows triggered on push to 
 
 ### A. APK Compilation (`.github/workflows/build-apk.yml`)
 * Automatically triggers on push/PR to `main`.
-* Injects `VITE_API_URL=https://tabby-6i0f.onrender.com/api` and `VITE_GOOGLE_CLIENT_ID`.
+* Injects `VITE_API_URL=https://tabby-api-bpb4.onrender.com/api` and `VITE_GOOGLE_CLIENT_ID`.
 * Runs `npm run build` and `npx cap sync android`.
 * Compiles debug APK via Gradle JDK 21 (`./gradlew assembleDebug`).
 * Uploads the build artifact as `Tabby-Android-App-Debug-v<version>` downloadable directly from GitHub Actions.

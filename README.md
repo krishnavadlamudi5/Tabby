@@ -6,7 +6,7 @@ the roadmap.
 
 | Part | Where it runs |
 |---|---|
-| API (`server/`) | Express + Mongoose on Render (`https://tabby-6i0f.onrender.com/api`) |
+| API (`server/`) | Express + Mongoose on Render (`https://tabby-api-bpb4.onrender.com/api`) |
 | Database | MongoDB Atlas |
 | Web app (`src/`) | React + Vite on Netlify |
 | Android app | Capacitor 8 (`com.tabby.app`), updated over the air from GitHub Releases |

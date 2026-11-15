@@ -26,7 +26,7 @@ anything unsigned or older than 5 minutes. Sent threads get the label
    the bank alerts, and create a **New project** named "Tabby sync".
 3. Replace the contents of `Code.gs` with this folder's `Code.gs`. Save.
 4. **Project Settings → Script Properties → Add script property**:
-   - `TABBY_INGEST_URL` = `https://tabby-6i0f.onrender.com/api/finance/ingest/email`
+   - `TABBY_INGEST_URL` = `https://tabby-api-bpb4.onrender.com/api/finance/ingest/email`
    - `TABBY_HMAC_SECRET` = the same value as `INGEST_HMAC_SECRET`
 5. In the editor, select `installTrigger` and press **Run**. Approve the
    permission prompt (Gmail read/label and external requests). This adds a

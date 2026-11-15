@@ -248,7 +248,7 @@ Create `tools/apps-script/Code.gs` + `tools/apps-script/README.md`:
 - Time-driven trigger every 10 minutes.
 - Search: `newer_than:3d -label:tabby-sent -category:promotions -category:social (debited OR credited OR paid OR payment OR refund OR refunded OR reversal OR invoice OR receipt OR order OR premium OR EMI OR installment OR "Rs." OR INR OR ₹ OR transaction OR statement OR policy OR renewal OR SIP OR subscription)`; also `has:attachment filename:pdf (statement OR invoice OR policy OR receipt)`.
 - For each message: send `{ messageId, threadId, from, to, subject, date, bodyText (plain, HTML→text fallback, max 100 KB), attachments: [{ filename, mimeType, size, base64 }] (PDF/images only, ≤10 MB each) }`.
-- POST to `https://tabby-6i0f.onrender.com/api/finance/ingest/email` with headers `X-Tabby-Timestamp` and `X-Tabby-Signature = HMAC-SHA256(INGEST_HMAC_SECRET, timestamp + "." + body)`.
+- POST to `https://tabby-api-bpb4.onrender.com/api/finance/ingest/email` with headers `X-Tabby-Timestamp` and `X-Tabby-Signature = HMAC-SHA256(INGEST_HMAC_SECRET, timestamp + "." + body)`.
 - On HTTP 200/409 apply label `tabby-sent`; on failure leave unlabeled so the next run retries. Retry once after 60 s if Render is cold-starting.
 - Store `INGEST_HMAC_SECRET` and the API URL in Script Properties (never in code).
 - A `backfill(startDate, endDate)` function for importing history in batches of 100.
