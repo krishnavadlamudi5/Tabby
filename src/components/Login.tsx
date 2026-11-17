@@ -3,7 +3,7 @@ import { RefreshCw, PlayCircle, ShieldCheck } from 'lucide-react';
 import AppLogo from './AppLogo';
 import { useAppStore } from '../store/useAppStore';
 import { signInWithGoogleApi } from '../lib/api';
-import { isCancelError, isNative, nativeGoogleIdToken, renderWebGoogleButton } from '../lib/googleAuth';
+import { isCancelError, isGoogleSetupError, isNative, nativeGoogleIdToken, renderWebGoogleButton } from '../lib/googleAuth';
 
 export default function Login() {
   const signIn = useAppStore((s) => s.signIn);
@@ -42,7 +42,11 @@ export default function Login() {
       await finishSignIn(idToken);
     } catch (err: any) {
       setIsLoading(false);
-      if (!isCancelError(err)) {
+      if (isGoogleSetupError(err)) {
+        setErrorMsg(
+          'Google sign-in isn\'t set up for this app build yet. In Google Cloud Console, add an Android OAuth client for com.tabby.app with this APK\'s SHA-1.'
+        );
+      } else if (!isCancelError(err)) {
         setErrorMsg(err?.message || 'Google sign-in failed. Please try again.');
       }
     }
