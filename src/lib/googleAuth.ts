@@ -18,6 +18,15 @@ export function isCancelError(err: unknown): boolean {
 
 // --- Android (native account picker) ---------------------------------
 
+/**
+ * True when Google rejected the app itself (Android OAuth client missing, or
+ * its SHA-1 doesn't match the APK's signing key) rather than the user.
+ */
+export function isGoogleSetupError(err: unknown): boolean {
+  const msg = String((err as any)?.message || err || '');
+  return /developer console|28444|DEVELOPER_ERROR|\b10:/i.test(msg);
+}
+
 let nativeInitialized = false;
 
 export async function nativeGoogleIdToken(): Promise<string> {
@@ -27,7 +36,9 @@ export async function nativeGoogleIdToken(): Promise<string> {
   }
   const response = await SocialLogin.login({
     provider: 'google',
-    options: { scopes: ['email', 'profile'] },
+    // 'standard' = Android's full "Sign in with Google" dialog: choose an
+    // account, approve permissions, then we get an ID token and log in.
+    options: { style: 'standard', scopes: ['email', 'profile'] } as any,
   });
   const idToken = (response?.result as any)?.idToken;
   if (!idToken) throw new Error('Google did not return an identity token.');
