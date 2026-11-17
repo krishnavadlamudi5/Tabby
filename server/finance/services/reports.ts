@@ -13,7 +13,7 @@ function monthKeys(year: number, basis: 'calendar' | 'fy'): string[] {
   return out;
 }
 
-async function totalFor(ownerId: string, from: Date, to: Date) {
+export async function totalFor(ownerId: string, from: Date, to: Date) {
   const [agg] = await Transaction.aggregate([
     { $match: buildTxnQuery(ownerId, { from, to }) },
     {

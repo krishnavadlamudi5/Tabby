@@ -396,6 +396,7 @@ export default function App() {
                 tab={activeView.tab}
                 params={activeView.params}
                 onNavigate={(tab, params) => setActiveView({ type: 'finance', tab, params })}
+                onOpenSettings={() => openSettings('money')}
               />
             )}
 

@@ -68,13 +68,14 @@ router.put('/me', async (req: AuthedRequest, res: Response): Promise<void> => {
 });
 
 // --- Preferences (synced across devices) ------------------------------
-const ALERT_GROUPS = ['renewals', 'commitments', 'declined', 'large_debit', 'refunds', 'documents', 'statements', 'policies', 'new_accounts'] as const;
+const ALERT_GROUPS = ['renewals', 'commitments', 'declined', 'large_debit', 'refunds', 'documents', 'statements', 'policies', 'new_accounts', 'budgets'] as const;
 const channel = z.enum(['off', 'app', 'email']);
 const preferencesBody = z.object({
   homeView: z.enum(['dashboard', 'money']).optional(),
   reportBasis: z.enum(['fy', 'calendar']).optional(),
   currency: z.string().length(3).optional(),
   largeDebitPaise: z.number().int().min(0).max(1_00_00_00_000).nullable().optional(),
+  monthlyBudgetPaise: z.number().int().min(0).max(1_00_00_00_000).nullable().optional(),
   alerts: z.object(Object.fromEntries(ALERT_GROUPS.map((g) => [g, channel.optional()]))).optional(),
 });
 

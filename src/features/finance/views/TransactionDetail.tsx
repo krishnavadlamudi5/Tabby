@@ -11,10 +11,10 @@ import SplitEditor from '../components/SplitEditor';
 import { formatPaise, paiseToInput, rupeesToPaise } from '../../../utils/currency';
 import type { Transaction } from '../types';
 
-export default function TransactionDetail({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
+export default function TransactionDetail({ id, onClose, onChanged, initialSection }: { id: string; onClose: () => void; onChanged: () => void; initialSection?: 'details' | 'split' | 'share' }) {
   const { accounts, categories } = useFinanceStore();
   const { data, error, loading, reload, setData } = useAsync(() => financeApi.transaction(id), [id]);
-  const [section, setSection] = useState<'details' | 'split' | 'share'>('details');
+  const [section, setSection] = useState<'details' | 'split' | 'share'>(initialSection || 'details');
 
   const txn = data?.transaction;
   const [form, setForm] = useState({ merchant: '', categoryId: null as string | null, kind: '', notes: '', tags: '', accountId: null as string | null });
@@ -85,7 +85,7 @@ export default function TransactionDetail({ id, onClose, onChanged }: { id: stri
         {(['details', 'split', 'share'] as const).map((s) => (
           <button key={s} type="button" onClick={() => setSection(s)}
             className={`px-3 py-1.5 text-[11px] font-bold rounded-lg cursor-pointer ${section === s ? 'bg-white shadow-xs text-[#3C5A48]' : 'text-[#736F6A]'}`}>
-            {s === 'details' ? 'Details' : s === 'split' ? `Split${txn.splits.length ? ` (${txn.splits.length})` : ''}` : 'Share & trip'}
+            {s === 'details' ? 'Details' : s === 'split' ? `Categories${txn.splits.length ? ` (${txn.splits.length})` : ''}` : 'Split with group'}
           </button>
         ))}
       </div>
@@ -273,30 +273,14 @@ function ShareAndTrip({ txn, onChanged }: { txn: Transaction; onChanged: (t: Tra
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
-        <SectionTitle><span className="inline-flex items-center gap-1"><Plane className="w-3.5 h-3.5" /> Add to trip</span></SectionTitle>
-        {trips.length === 0 ? <span className="text-xs text-[#736F6A]">Create a group with the "Trip" category to track trips.</span> : (
-          <div className="flex gap-2">
-            <Select value={tripId} onChange={setTripId}>
-              <option value="">Not on a trip</option>
-              {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </Select>
-            <Button size="sm" busy={busy} onClick={async () => {
-              setBusy(true);
-              try { onChanged((await financeApi.updateTransaction(txn.id, { tripId: tripId || null, learn: false })).transaction); toastOk(tripId ? 'Added to trip' : 'Removed from trip'); } catch (e) { toastError(e); } finally { setBusy(false); }
-            }}>Save</Button>
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <SectionTitle><span className="inline-flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Share with friends</span></SectionTitle>
+        <SectionTitle><span className="inline-flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Split with a group or friends</span></SectionTitle>
         {txn.sharedExpenseId ? (
           <span className="text-xs text-[#736F6A]">Already shared. My share: <b>{formatPaise(txn.mySharePaise || 0)}</b>. Edit the split from the group or friend screen.</span>
         ) : txn.direction !== 'debit' ? <span className="text-xs text-[#736F6A]">Only payments can be shared.</span> : (
           <>
             <Field label="Description"><TextInput value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
-            <Field label="Group (optional)">
-              <Select value={groupId} onChange={(v) => { setGroupId(v); setSelected([]); }}>
+            <Field label="Group" hint="Picking a group splits with everyone in it; tap names to change">
+              <Select value={groupId} onChange={(v) => { setGroupId(v); setSelected(v ? (groups.find((g) => g.id === v)?.members || []).filter((m) => m !== currentUser.id) : []); }}>
                 <option value="">No group (between friends)</option>
                 {groups.filter((g) => g.members.includes(currentUser.id)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </Select>
@@ -332,6 +316,22 @@ function ShareAndTrip({ txn, onChanged }: { txn: Transaction; onChanged: (t: Tra
           </>
         )}
       </div>
+      <div className="flex flex-col gap-2">
+        <SectionTitle><span className="inline-flex items-center gap-1"><Plane className="w-3.5 h-3.5" /> Add to trip</span></SectionTitle>
+        {trips.length === 0 ? <span className="text-xs text-[#736F6A]">Create a group with the "Trip" category to track trips.</span> : (
+          <div className="flex gap-2">
+            <Select value={tripId} onChange={setTripId}>
+              <option value="">Not on a trip</option>
+              {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </Select>
+            <Button size="sm" busy={busy} onClick={async () => {
+              setBusy(true);
+              try { onChanged((await financeApi.updateTransaction(txn.id, { tripId: tripId || null, learn: false })).transaction); toastOk(tripId ? 'Added to trip' : 'Removed from trip'); } catch (e) { toastError(e); } finally { setBusy(false); }
+            }}>Save</Button>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

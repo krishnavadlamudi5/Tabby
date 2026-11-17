@@ -27,6 +27,7 @@ const SECTIONS: { id: SettingsSection; label: string; icon: React.ReactNode; sig
 ];
 
 const ALERT_GROUPS: { id: string; label: string; hint: string; def: AlertChannel }[] = [
+  { id: 'budgets', label: 'Budgets', hint: 'At 80% and when you go over (email only when over)', def: 'email' },
   { id: 'renewals', label: 'Policy renewals', hint: '30, 7 and 1 day before', def: 'email' },
   { id: 'commitments', label: 'EMIs, SIPs & subscriptions', hint: 'Due soon, missed, failed, needs action', def: 'email' },
   { id: 'declined', label: 'Declined payments', hint: 'A card or UPI payment was declined', def: 'email' },
@@ -192,7 +193,7 @@ export default function SettingsView({ section, onBack, onNavigateFinance, liveU
             <span className="text-[#736F6A]">
               {s.lastReceivedAt ? <>Last email {fmtDate(s.lastReceivedAt, true)}{s.lastSubject ? ` · "${s.lastSubject.slice(0, 50)}"` : ''}. </> : null}
               {s.emailsThisWeek} this week · {s.emailsTotal} total · {s.needsReview} to review.
-              {!s.configured && ' Set INGEST_HMAC_SECRET on the server and install the Gmail script (Money → Import).'}
+              {!s.configured && ' Set INGEST_HMAC_SECRET on the server and install the Gmail script (Import statements & Gmail, below).'}
               {s.configured && !s.isIngestOwner && ' Gmail import is linked to a different Tabby account (INGEST_OWNER_EMAIL).'}
             </span>
           )}
@@ -213,10 +214,22 @@ export default function SettingsView({ section, onBack, onNavigateFinance, liveU
               if ((v ?? null) !== (prefs.largeDebitPaise ?? null)) void save({ largeDebitPaise: v });
             }} />
         </Field>
-        <div className="grid grid-cols-2 gap-2">
-          {([['accounts', 'Accounts & statements'], ['categories', 'Categories & budgets'], ['insurance', 'PDF passwords'], ['import', 'Gmail setup & import']] as [FinanceTab, string][]).map(([tab, label]) => (
-            <Button key={tab} size="sm" variant="secondary" onClick={() => onNavigateFinance(tab)}>{label}</Button>
-          ))}
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] font-bold text-[#2C2B29]">Money setup</span>
+          <div className="flex flex-col divide-y divide-[#F2EFEA] border border-[#E6E1DA] rounded-xl overflow-hidden" id="money-setup-links">
+            {([
+              ['accounts', 'Bank accounts & cards', 'Add accounts, card numbers and statement passwords'],
+              ['categories', 'Categories & budgets', 'Spending categories, monthly budgets and auto-rules'],
+              ['import', 'Import statements & Gmail', 'Upload a bank statement, Gmail script status'],
+              ['documents', 'Documents', 'All saved PDFs and photos (policies, bills, IDs)'],
+              ['passwords', 'PDF passwords', 'For locked policy PDFs from insurers'],
+            ] as [FinanceTab, string, string][]).map(([tab, label, hint]) => (
+              <button key={tab} type="button" onClick={() => onNavigateFinance(tab)} className="flex items-center gap-3 px-3 py-2.5 text-left bg-white hover:bg-[#FAF8F5] cursor-pointer">
+                <div className="flex-1 min-w-0"><div className="text-xs font-bold">{label}</div><div className="text-[11px] text-[#736F6A]">{hint}</div></div>
+                <span className="text-[#A39E98]">›</span>
+              </button>
+            ))}
+          </div>
         </div>
       </Section>
     );

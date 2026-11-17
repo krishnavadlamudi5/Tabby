@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, CartesianGrid } from 'recharts';
+import { StatTile } from '../components/period';
+import { usePrefsStore } from '../../../store/usePrefsStore';
 import { Bike, Car, CheckCircle2, Download, FileSearch, FileText, HeartPulse, KeyRound, Link2, Loader2, Plus, Shield, Sparkles, Trash2, Upload, UserPlus } from 'lucide-react';
 import { financeApi, saveBlob } from '../api';
 import { Badge, Button, Card, Empty, ErrorBlock, Field, Money, SectionTitle, Select, Sheet, Spinner, TextArea, TextInput, fmtDate, toDateInput, toastError, toastOk, useAsync } from '../components/ui';
 import { formatPaise, paiseToInput, rupeesToPaise } from '../../../utils/currency';
-import type { Claim, Person, Policy, PolicyExtraction, PolicyType } from '../types';
+import type { Claim, Person, Policy, PolicyExtraction, PolicyType, PremiumSummary } from '../types';
 import { documentToText } from '../ocr';
 import PremiumSummaryCard from '../components/PremiumSummaryCard';
 import { copyText, openExternal, renewLink } from '../insurers';
@@ -34,9 +37,13 @@ export default function Insurance() {
   const [editing, setEditing] = useState<Policy | 'new' | null>(null);
   const [draft, setDraft] = useState<{ prefill: Partial<Policy>; file?: File; note?: string } | null>(null);
   const [reading, setReading] = useState<string | null>(null);
-  const [groupBy, setGroupBy] = useState<'type' | 'person'>('type');
+  const [groupBy, setGroupBy] = useState<'type' | 'person'>('person');
+  const [personFilter, setPersonFilter] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>('');
+  const basis = usePrefsStore((st) => st.prefs.reportBasis) || 'fy';
   const [refreshKey, setRefreshKey] = useState(0);
   const people = useAsync(() => financeApi.people(), [refreshKey]);
+  const summary = useAsync(() => financeApi.premiumSummary(basis, 4), [basis, refreshKey]);
   const refresh = () => { reload(); tax.reload(); setRefreshKey((k) => k + 1); };
 
   const addFromDocument = async (file: File) => {
@@ -63,6 +70,8 @@ export default function Insurance() {
   if (loading && !data) return <Spinner />;
   if (error) return <ErrorBlock message={error} onRetry={reload} />;
   const policies = data?.policies || [];
+  const shown = policies.filter((p) => (!typeFilter || policyKind(p) === typeFilter)
+    && (!personFilter || (personFilter === 'vehicles' ? p.type === 'vehicle' : p.insuredMemberIds.includes(personFilter))));
 
   return (
     <div className="flex flex-col gap-4">
@@ -79,19 +88,29 @@ export default function Insurance() {
         <Empty title="No policies yet" text="Policies emailed to you are added automatically. You can also add one by hand or from a PDF/photo. Tabby reminds you 30, 7 and 1 days before renewal and links premium payments." action={<Button onClick={() => setEditing('new')}>Add policy</Button>} />
       ) : (
         <>
-          <PremiumSummaryCard refreshKey={refreshKey} />
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-bold text-[#736F6A] uppercase tracking-wider">{policies.length} {policies.length === 1 ? 'policy' : 'policies'}</span>
-            <div className="inline-flex rounded-xl border border-[#E6E1DA] p-0.5 bg-[#FAF8F5]">
-              {(['type', 'person'] as const).map((g) => (
-                <button key={g} type="button" onClick={() => setGroupBy(g)}
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg cursor-pointer ${groupBy === g ? 'bg-white shadow-xs text-[#3C5A48]' : 'text-[#736F6A]'}`}>
-                  By {g === 'type' ? 'type' : 'person'}
-                </button>
-              ))}
+          <InsuranceDashboard policies={policies} summary={summary.data} basis={basis} onOpen={setOpenId} />
+
+          <div className="flex flex-col gap-2" id="policy-filters">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-bold text-[#736F6A] uppercase tracking-wider">{shown.length} of {policies.length} {policies.length === 1 ? 'policy' : 'policies'}</span>
+              <div className="inline-flex rounded-xl border border-[#E6E1DA] p-0.5 bg-[#FAF8F5]">
+                {(['person', 'type'] as const).map((g) => (
+                  <button key={g} type="button" onClick={() => setGroupBy(g)}
+                    className={`px-2.5 py-1 text-[11px] font-bold rounded-lg cursor-pointer ${groupBy === g ? 'bg-white shadow-xs text-[#3C5A48]' : 'text-[#736F6A]'}`}>
+                    By {g === 'type' ? 'type' : 'person'}
+                  </button>
+                ))}
+              </div>
             </div>
+            <Chips value={personFilter} onChange={setPersonFilter} options={[
+              ['', 'Everyone'],
+              ...(people.data?.people || []).filter((m) => policies.some((p) => p.insuredMemberIds.includes(m.id))).map((m) => [m.id, `${m.name} · ${m.relation}`] as [string, string]),
+              ...(policies.some((p) => p.type === 'vehicle') ? [['vehicles', 'Vehicles'] as [string, string]] : []),
+            ]} />
+            <Chips value={typeFilter} onChange={setTypeFilter} options={[['', 'All types'], ...Array.from(new Set(policies.map(policyKind))).map((k) => [k, k] as [string, string])]} />
           </div>
-          {groupPolicies(policies, groupBy, people.data?.people || []).map(([group, list]) => (
+          {shown.length === 0 && <span className="text-xs text-[#736F6A]">No policies match these filters.</span>}
+          {groupPolicies(shown, groupBy, people.data?.people || []).map(([group, list]) => (
             <div key={group} className="flex flex-col gap-2">
               <div className="flex items-center justify-between px-1">
                 <span className="text-xs font-extrabold">{group}</span>
@@ -102,6 +121,8 @@ export default function Insurance() {
               </div>
             </div>
           ))}
+
+          <PremiumSummaryCard refreshKey={refreshKey} />
         </>
       )}
 
@@ -115,8 +136,6 @@ export default function Insurance() {
           <p className="text-[10px] text-[#A39E98] mt-2">From premium payments linked to policies marked 80C/80D. Not tax advice.</p>
         </Card>
       )}
-
-      <PdfPasswords />
 
       {openId && <PolicyDetail id={openId} onClose={() => setOpenId(null)} onEdit={(p) => { setOpenId(null); setEditing(p); }} onChanged={refresh} />}
       {editing && <PolicyForm policy={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh(); }} />}
@@ -368,7 +387,7 @@ export function prefillFromExtraction(x: PolicyExtraction): Partial<Policy> {
 }
 
 /** Passwords for locked policy PDFs, tried automatically on new emails. Write-only. */
-function PdfPasswords() {
+export function PdfPasswords() {
   const { data, reload } = useAsync(() => financeApi.docPasswords(), []);
   const [label, setLabel] = useState('');
   const [password, setPassword] = useState('');
@@ -406,7 +425,7 @@ function groupPolicies(policies: Policy[], by: 'type' | 'person', people: Person
   const add = (k: string, p: Policy) => groups.set(k, [...(groups.get(k) || []), p]);
   for (const p of policies) {
     if (by === 'type') {
-      add(p.type === 'vehicle' ? (/car/i.test(p.planName) ? 'Car' : /two|bike/i.test(p.planName) ? 'Bike' : 'Vehicle') : TYPE_LABEL[p.type], p);
+      add(policyKind(p), p);
     } else {
       const members = p.insuredMemberIds.map((id) => people.find((x) => x.id === id)).filter(Boolean) as Person[];
       if (!members.length) add(p.type === 'vehicle' ? 'Vehicles' : 'Not set', p);
@@ -476,5 +495,113 @@ function RecordPayment({ policy, onClose, onSaved }: { policy: Policy; onClose: 
       </div>
       <Field label="Note (optional)"><TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. paid by Dad's card" /></Field>
     </Sheet>
+  );
+}
+
+/** Display type: vehicles split into Car / Bike. */
+function policyKind(p: Policy): string {
+  if (p.type !== 'vehicle') return TYPE_LABEL[p.type];
+  return /car|four|private/i.test(`${p.planName} ${p.insurer}`) ? 'Car' : /two|bike|scooter|motor ?cycle/i.test(`${p.planName} ${p.insurer}`) ? 'Bike' : 'Vehicle';
+}
+
+function Chips({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: [string, string][] }) {
+  if (options.length <= 2) return null;
+  return (
+    <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
+      {options.map(([v, label]) => (
+        <button key={v || 'all'} type="button" onClick={() => onChange(v)}
+          className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer whitespace-nowrap ${value === v ? 'bg-[#3C5A48] text-white border-[#3C5A48]' : 'bg-white border-[#E6E1DA] text-[#736F6A]'}`}>{label}</button>
+      ))}
+    </div>
+  );
+}
+
+const KIND_COLORS = ['#3C5A48', '#2E86AB', '#E9C46A', '#C86D51', '#6D597A', '#2A9D8F', '#B5838D', '#A39E98'];
+
+/** Top of the Insurance page: totals, renewals due soon and two charts. */
+function InsuranceDashboard({ policies, summary, basis, onOpen }: { policies: Policy[]; summary: PremiumSummary | null; basis: 'fy' | 'calendar'; onOpen: (id: string) => void }) {
+  const active = policies.filter((p) => p.status === 'active' || p.status === 'renewal_due');
+  const due = useMemo(() => policies
+    .filter((p) => p.status !== 'cancelled' && p.status !== 'lapsed' && p.status !== 'renewed')
+    .map((p) => ({ p, d: daysTo(p.renewalDate) }))
+    .filter((x): x is { p: Policy; d: number } => x.d !== null && x.d <= 30)
+    .sort((a, b) => a.d - b.d), [policies]);
+  const yearLabel = summary?.years[summary.years.length - 1];
+  const paidThisYear = yearLabel ? summary!.totalsByYear[yearLabel] || 0 : 0;
+  const yearly = active.reduce((s, p) => s + yearlyPremium(p), 0);
+  const cover = active.filter((p) => p.type !== 'vehicle').reduce((s, p) => s + p.sumInsuredPaise, 0);
+  const byKind = Array.from(active.reduce((m, p) => m.set(policyKind(p), (m.get(policyKind(p)) || 0) + yearlyPremium(p)), new Map<string, number>()).entries())
+    .map(([name, value]) => ({ name, value })).filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
+
+  return (
+    <div className="flex flex-col gap-3" id="insurance-dashboard">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <StatTile label={`Paid · ${yearLabel ? (basis === 'fy' ? `FY ${yearLabel}` : yearLabel) : 'this year'}`} value={formatPaise(paidThisYear)} sub="Premiums linked to policies" />
+        <StatTile label="Premiums a year" value={formatPaise(yearly)} sub={`${active.length} active ${active.length === 1 ? 'policy' : 'policies'}`} />
+        <StatTile label="Health & life cover" value={formatPaise(cover)} sub="Sum insured, excluding vehicles" />
+        <StatTile label="Due in 30 days" value={due.length ? formatPaise(due.reduce((s, x) => s + x.p.premiumPaise, 0)) : 'None'}
+          tone={due.some((x) => x.d < 0) ? 'bad' : due.length ? 'warn' : 'good'} sub={due.length ? `${due.length} renewal${due.length === 1 ? '' : 's'}` : 'Nothing to renew soon'} />
+      </div>
+
+      {due.length > 0 && (
+        <Card className="!border-[#E9C46A]/70" >
+          <SectionTitle>Renew soon</SectionTitle>
+          <div className="flex flex-col divide-y divide-[#F2EFEA]">
+            {due.map(({ p, d }) => (
+              <div key={p.id} className="flex items-center gap-3 py-2">
+                <button type="button" onClick={() => onOpen(p.id)} className="flex items-center gap-2 flex-1 min-w-0 text-left cursor-pointer">
+                  <div className="w-8 h-8 rounded-xl bg-[#FFF8E6] text-[#8A5A00] flex items-center justify-center shrink-0"><PolicyIcon p={p} /></div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold truncate">{p.insurer} · {policyKind(p)}{p.vehicleNumber ? ` · ${p.vehicleNumber}` : ''}</div>
+                    <div className={`text-[11px] ${d < 0 ? 'text-[#C86D51] font-bold' : 'text-[#736F6A]'}`}>{d < 0 ? `Overdue by ${-d} days` : d === 0 ? 'Due today' : `In ${d} days`} · {fmtDate(p.renewalDate)} · {formatPaise(p.premiumPaise)}</div>
+                  </div>
+                </button>
+                <RenewButton p={p} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Card>
+          <SectionTitle>Yearly premium by type</SectionTitle>
+          {byKind.length === 0 ? <span className="text-xs text-[#736F6A]">Add premiums to your policies to see this.</span> : (
+            <div className="flex items-center gap-3">
+              <div className="w-32 h-32 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={byKind} dataKey="value" nameKey="name" innerRadius={34} outerRadius={60} paddingAngle={2} isAnimationActive={false}>
+                      {byKind.map((_, i) => <Cell key={i} fill={KIND_COLORS[i % KIND_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v: any) => formatPaise(Number(v))} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex-1 flex flex-col gap-1 text-xs min-w-0">
+                {byKind.map((k, i) => (
+                  <div key={k.name} className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: KIND_COLORS[i % KIND_COLORS.length] }} /><span className="flex-1 truncate">{k.name}</span><b className="tabular-nums">{formatPaise(k.value)}</b></div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+        <Card>
+          <SectionTitle>Premiums paid by year</SectionTitle>
+          {!summary || summary.years.every((y) => !summary.totalsByYear[y]) ? <span className="text-xs text-[#736F6A]">Payments linked to policies show here. Use "Record payment" on a policy to add older ones.</span> : (
+            <div className="h-32">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={summary.years.map((y) => ({ name: basis === 'fy' ? `FY ${y}` : y, value: (summary.totalsByYear[y] || 0) / 100 }))}>
+                  <CartesianGrid vertical={false} stroke="#F2EFEA" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip formatter={(v: any) => formatPaise(Math.round(Number(v) * 100))} />
+                  <Bar dataKey="value" fill="#3C5A48" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
   );
 }

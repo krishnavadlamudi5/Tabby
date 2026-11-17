@@ -11,7 +11,13 @@ import { formatPaise, rupeesToPaise } from '../../../utils/currency';
 import TransactionDetail from './TransactionDetail';
 import type { Account, Category, Transaction } from '../types';
 
-export default function Transactions({ initial }: { key?: string; initial?: Record<string, string> }) {
+/**
+ * Payment list with search and filters. On its own it has a month switcher;
+ * inside the Spending page (`embedded`) it follows the page's period.
+ */
+export default function Transactions({ initial, from, to, embedded, onChanged }: {
+  key?: string; initial?: Record<string, string>; from?: string; to?: string; embedded?: boolean; onChanged?: () => void;
+}) {
   const { accounts, categories } = useFinanceStore();
   const [month, setMonth] = useState(initial?.month || currentMonth());
   const [accountId, setAccountId] = useState(initial?.accountId || '');
@@ -27,7 +33,7 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
   const [totals, setTotals] = useState<{ count: number; debitPaise: number; creditPaise: number; spendPaise: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [openId, setOpenId] = useState<string | null>(initial?.open || null);
+  const [open, setOpen] = useState<{ id: string; section?: 'details' | 'split' | 'share' } | null>(initial?.open ? { id: initial.open } : null);
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
@@ -35,7 +41,8 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
     return () => clearTimeout(t);
   }, [q]);
 
-  const filters = { month, accountId, categoryId, kind, status, tag, q: query, includeExcluded };
+  const range = from && to ? { from, to } : { month };
+  const filters = { ...range, accountId, categoryId, kind, status, tag, q: query, includeExcluded };
   const load = async (more = false) => {
     setLoading(true);
     setError(null);
@@ -51,7 +58,9 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
     }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { void load(false); }, [month, accountId, categoryId, kind, status, tag, query, includeExcluded]);
+  useEffect(() => { void load(false); }, [month, from, to, accountId, categoryId, kind, status, tag, query, includeExcluded]);
+  // The Spending page picks a category from its chart.
+  useEffect(() => { if (embedded) setCategoryId(initial?.categoryId || ''); }, [embedded, initial?.categoryId]);
 
   const byDay = useMemo(() => {
     const groups = new Map<string, Transaction[]>();
@@ -65,7 +74,7 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <MonthSwitcher month={month} onChange={setMonth} />
+        {embedded ? <span className="text-[11px] font-bold text-[#736F6A] uppercase tracking-wider">Payments{totals ? ` · ${totals.count}` : ''}</span> : <MonthSwitcher month={month} onChange={setMonth} />}
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" onClick={async () => {
             try {
@@ -77,7 +86,7 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
                 if (!r.nextCursor) break;
                 c = r.nextCursor;
               }
-              downloadCSV(`tabby_transactions_${month}.csv`, [
+              downloadCSV(`tabby_transactions_${from && to ? `${from}_${to}` : month}.csv`, [
                 ['Date', 'Merchant', 'Description', 'Category', 'Account', 'Kind', 'Status', 'Direction', 'Amount (INR)', 'My share (INR)', 'Tags', 'Notes'],
                 ...all.map((t) => [t.postedAt.slice(0, 10), t.merchant, t.description, t.splits.length ? t.splits.map((p) => `${categoryLabel(categories, p.categoryId)} ${(p.amountPaise / 100).toFixed(2)}`).join('; ') : categoryLabel(categories, t.categoryId),
                   accountLabel(accounts.find((a) => a.id === t.accountId)), t.kind, t.status, t.direction, (t.amountPaise / 100).toFixed(2), t.mySharePaise !== null ? (t.mySharePaise / 100).toFixed(2) : '', t.tags.join(' '), t.notes]),
@@ -122,7 +131,7 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
         {categoryId === 'none' && <span className="text-[11px] text-[#736F6A]">Showing uncategorised only.</span>}
       </Card>
 
-      {totals && (
+      {totals && !embedded && (
         <div className="grid grid-cols-3 gap-2">
           <Card className="!p-3"><div className="text-[10px] text-[#736F6A] font-bold uppercase">Spend</div><div className="text-sm font-extrabold tabular-nums">{formatPaise(totals.spendPaise)}</div></Card>
           <Card className="!p-3"><div className="text-[10px] text-[#736F6A] font-bold uppercase">Money out</div><div className="text-sm font-extrabold tabular-nums">{formatPaise(totals.debitPaise)}</div></Card>
@@ -139,7 +148,7 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
         <div key={day} className="flex flex-col gap-1">
           <span className="text-[11px] font-bold text-[#736F6A] px-1">{day}</span>
           <Card className="!p-0 divide-y divide-[#F2EFEA] overflow-hidden">
-            {list.map((t) => <TxnRow key={t.id} t={t} accounts={accounts} categories={categories} onOpen={() => setOpenId(t.id)} />)}
+            {list.map((t) => <TxnRow key={t.id} t={t} accounts={accounts} categories={categories} onOpen={() => setOpen({ id: t.id })} onSplit={() => setOpen({ id: t.id, section: 'share' })} />)}
           </Card>
         </div>
       ))}
@@ -147,8 +156,8 @@ export default function Transactions({ initial }: { key?: string; initial?: Reco
       {loading && <Spinner />}
       {!loading && cursor && <Button variant="secondary" onClick={() => load(true)}>Load more</Button>}
 
-      {openId && <TransactionDetail id={openId} onClose={() => setOpenId(null)} onChanged={() => load(false)} />}
-      {adding && <AddTransaction onClose={() => setAdding(false)} onSaved={() => { setAdding(false); void load(false); }} />}
+      {open && <TransactionDetail id={open.id} initialSection={open.section} onClose={() => setOpen(null)} onChanged={() => { void load(false); onChanged?.(); }} />}
+      {adding && <AddTransaction onClose={() => setAdding(false)} onSaved={() => { setAdding(false); void load(false); onChanged?.(); }} />}
     </div>
   );
 
@@ -211,11 +220,11 @@ function AddTransaction({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   );
 }
 
-function TxnRow({ t, onOpen, accounts, categories }: { key?: string; t: Transaction; onOpen: () => void; accounts: Account[]; categories: Category[] }) {
+function TxnRow({ t, onOpen, onSplit, accounts, categories }: { key?: string; t: Transaction; onOpen: () => void; onSplit: () => void; accounts: Account[]; categories: Category[] }) {
     const acc = accounts.find((a) => a.id === t.accountId);
     const muted = t.status === 'declined' || t.kind === 'self_transfer' || t.kind === 'cc_bill_payment';
     return (
-      <button type="button" onClick={onOpen} className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-[#FAF8F5] cursor-pointer">
+      <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-[#FAF8F5] cursor-pointer">
         <span className="w-2 h-8 rounded-full shrink-0" style={{ background: t.splits.length ? 'linear-gradient(#5B8C5A,#E9C46A,#C86D51)' : categoryColor(categories, t.categoryId) }} />
         <div className="flex-1 min-w-0">
           <div className={`text-xs font-semibold truncate ${muted ? 'text-[#736F6A]' : ''}`}>{t.merchant || t.description || KIND_LABELS[t.kind]}</div>
@@ -237,8 +246,14 @@ function TxnRow({ t, onOpen, accounts, categories }: { key?: string; t: Transact
         <div className="text-right shrink-0">
           <Money paise={t.amountPaise} currency={t.currency} direction={t.direction} strike={t.status === 'declined'} className="text-xs" />
           {t.mySharePaise !== null && t.mySharePaise !== undefined && <div className="text-[10px] text-[#736F6A]">my share {formatPaise(t.mySharePaise)}</div>}
+          {t.direction === 'debit' && !t.sharedExpenseId && t.status !== 'declined' && !muted && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); onSplit(); }} title="Split with a group or friends"
+              className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border border-[#E6E1DA] text-[10px] font-bold text-[#3C5A48] hover:bg-[#EBF1ED] cursor-pointer">
+              <Users className="w-3 h-3" /> Split
+            </button>
+          )}
         </div>
-      </button>
+      </div>
     );
   }
 }

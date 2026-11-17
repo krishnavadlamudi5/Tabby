@@ -12,6 +12,8 @@ import { applyCategory } from '../services/ingest/pipeline';
 import { assertSplitsTotal, autoSplitLineItems, partsFromPercents } from '../services/ledger/splits';
 import { categoryIdsByKey } from '../services/categories';
 import { displayMerchant } from '../services/ledger/merchants';
+import { parseDay } from '../services/spending';
+import { addDays } from '../lib/time';
 import { findVisibleUsers } from '../../services/userVisibility';
 
 const router = Router();
@@ -37,7 +39,16 @@ router.get('/', handler(async (req, res) => {
     if (qp[key] && qp[key] !== 'none' && !isObjectId(qp[key])) { res.status(400).json({ error: `Invalid ${key}` }); return; }
   }
   if (qp.month && !/^\d{4}-\d{2}$/.test(qp.month)) { res.status(400).json({ error: 'month must be YYYY-MM' }); return; }
-  const filter = buildTxnQuery(req.userId!, { ...qp, includeExcluded: qp.includeExcluded === 'true' });
+  for (const key of ['from', 'to']) {
+    if (qp[key] && !/^\d{4}-\d{2}-\d{2}$/.test(qp[key])) { res.status(400).json({ error: `${key} must be YYYY-MM-DD` }); return; }
+  }
+  // from/to are India dates, both inclusive.
+  const filter = buildTxnQuery(req.userId!, {
+    ...qp,
+    from: qp.from ? parseDay(qp.from) : undefined,
+    to: qp.to ? addDays(parseDay(qp.to), 1) : undefined,
+    includeExcluded: qp.includeExcluded === 'true',
+  });
   const limit = pageLimit(qp.limit);
   const page: Record<string, any> = { ...filter };
   const cursor = qp.cursor ? decodeCursor(qp.cursor) : null;
