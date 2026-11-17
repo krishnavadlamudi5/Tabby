@@ -9,14 +9,16 @@ import type { Commitment } from '../types';
 
 const TYPE_LABEL: Record<Commitment['type'], string> = { emi: 'EMI', sip: 'SIP', subscription: 'Subscription', premium: 'Premium', rent: 'Rent', other: 'Other' };
 
-export default function Commitments() {
+/** Bills & EMIs: rent, loans, subscriptions. SIPs live on the Investments page, premiums on Insurance. */
+export default function Commitments({ exclude = ['sip'] }: { exclude?: Commitment['type'][] }) {
   const { data, error, loading, reload } = useAsync(() => financeApi.commitments(), []);
   const suggestions = useAsync(() => financeApi.commitmentSuggestions(), []);
   const [editing, setEditing] = useState<Commitment | Partial<Commitment> | null>(null);
 
   if (loading && !data) return <Spinner />;
   if (error) return <ErrorBlock message={error} onRetry={reload} />;
-  const list = data?.commitments || [];
+  const all = data?.commitments || [];
+  const list = all.filter((c) => !exclude.includes(c.type));
   const monthly = list.filter((c) => c.status !== 'paused' && c.currency === 'INR').reduce((s, c) => {
     const factor = { weekly: 52 / 12, monthly: 1, quarterly: 1 / 3, half_yearly: 1 / 6, yearly: 1 / 12 }[c.schedule.freq] || 1;
     return s + c.amountPaise * factor;
@@ -25,7 +27,7 @@ export default function Commitments() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-[#736F6A]">About <b>{formatPaise(Math.round(monthly))}</b> a month in EMIs, SIPs, subscriptions and premiums.</span>
+        <span className="text-xs text-[#736F6A]">About <b>{formatPaise(Math.round(monthly))}</b> a month in EMIs, rent, subscriptions and premiums. SIPs are under Investments.</span>
         <Button size="sm" onClick={() => setEditing({ type: 'emi', schedule: { freq: 'monthly', nextDueDate: new Date().toISOString() } as any })}><Plus className="w-3.5 h-3.5" /> Add</Button>
       </div>
 
@@ -45,7 +47,7 @@ export default function Commitments() {
         </Card>
       )}
 
-      {list.length === 0 ? <Empty title="No commitments yet" text="EMI due emails, SIP order reports and policy premiums add themselves here. You can also add rent or subscriptions." /> : (
+      {list.length === 0 ? <Empty title="No bills yet" text="EMI due emails and policy premiums add themselves here. You can also add rent or subscriptions." /> : (
         <Card className="!p-0 divide-y divide-[#F2EFEA]">
           {list.map((c) => (
             <button key={c.id} type="button" onClick={() => setEditing(c)} className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-[#FAF8F5] cursor-pointer">
@@ -66,7 +68,7 @@ export default function Commitments() {
   );
 }
 
-function CommitmentForm({ initial, onClose, onSaved }: { initial: Partial<Commitment>; onClose: () => void; onSaved: () => void }) {
+export function CommitmentForm({ initial, onClose, onSaved }: { initial: Partial<Commitment>; onClose: () => void; onSaved: () => void }) {
   const { accounts } = useFinanceStore();
   const existing = initial.id ? (initial as Commitment) : null;
   const [f, setF] = useState({
@@ -96,7 +98,7 @@ function CommitmentForm({ initial, onClose, onSaved }: { initial: Partial<Commit
     }
   };
   return (
-    <Sheet title={existing ? existing.name : 'Add commitment'} onClose={onClose} footer={<>
+    <Sheet title={existing ? existing.name : initial.type === 'sip' ? 'Add SIP' : 'Add bill or EMI'} onClose={onClose} footer={<>
       {existing && <Button variant="danger" onClick={async () => { if (window.confirm('Delete?')) { await financeApi.deleteCommitment(existing.id); onSaved(); } }}>Delete</Button>}
       <Button variant="secondary" onClick={onClose}>Cancel</Button><Button busy={busy} onClick={save}>Save</Button>
     </>}>

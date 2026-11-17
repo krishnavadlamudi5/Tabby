@@ -14,7 +14,13 @@ async function spendFor(ownerId: string, month: string): Promise<number> {
  * only my share (scaled across parts).
  */
 export async function categorySpend(ownerId: string, month: string): Promise<Map<string, number>> {
-  const txns = await Transaction.find({ ...buildTxnQuery(ownerId, { month }), status: 'settled', kind: { $in: ['expense', 'fee', 'emi', 'refund'] } });
+  const { start, end } = istMonthRange(month);
+  return categorySpendRange(ownerId, start, end);
+}
+
+/** categorySpend for any [from, to) range. */
+export async function categorySpendRange(ownerId: string, from: Date, to: Date): Promise<Map<string, number>> {
+  const txns = await Transaction.find({ ...buildTxnQuery(ownerId, { from, to }), status: 'settled', kind: { $in: ['expense', 'fee', 'emi', 'refund'] } });
   const out = new Map<string, number>();
   const add = (id: unknown, v: number) => {
     const k = id ? String(id) : 'none';

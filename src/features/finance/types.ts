@@ -246,8 +246,53 @@ export interface Dashboard {
   unreadAlerts: number;
 }
 
+/** Main pages (in the sidebar) and the pages opened from them or from Settings. */
 export type FinanceTab =
-  | 'home' | 'transactions' | 'reports' | 'review' | 'accounts' | 'commitments' | 'insurance' | 'documents' | 'categories' | 'import';
+  | 'home' | 'transactions' | 'insurance' | 'investments'
+  | 'reports' | 'review' | 'accounts' | 'commitments' | 'documents' | 'categories' | 'import' | 'passwords';
+
+export interface SpendingSummary {
+  from: string;
+  to: string;
+  days: number;
+  granularity: 'day' | 'month';
+  spendPaise: number;
+  incomePaise: number;
+  previous: { from: string; to: string; spendPaise: number };
+  byCategory: { categoryId: string | null; key: string; name: string; color: string; icon: string; amountPaise: number; children: { categoryId: string; name: string; amountPaise: number }[] }[];
+  trend: { key: string; spendPaise: number }[];
+  budget: { monthlyPaise: number; budgetPaise: number; spentPaise: number } | null;
+  categoryBudgets: { categoryId: string; name: string; color: string; monthlyPaise: number; budgetPaise: number; spentPaise: number }[];
+  topMerchants: { name: string; amountPaise: number; count: number }[];
+}
+
+export type HoldingType = 'mutual_fund' | 'stock' | 'fd' | 'rd' | 'ppf' | 'epf' | 'nps' | 'gold' | 'bond' | 'real_estate' | 'crypto' | 'other';
+
+export interface Holding {
+  id: string;
+  name: string;
+  type: HoldingType;
+  provider: string;
+  reference: string;
+  investedPaise: number;
+  currentValuePaise: number;
+  valueAsOf: string;
+  startDate?: string | null;
+  maturityDate?: string | null;
+  interestRatePct?: number | null;
+  commitmentId: string | null;
+  history: { date: string; investedPaise: number; valuePaise: number }[];
+  notes: string;
+  isActive: boolean;
+}
+
+export interface InvestmentSummary {
+  totals: { investedPaise: number; valuePaise: number; gainPaise: number; gainPct: number | null; sipMonthlyPaise: number; putInThisMonthPaise: number; putInLast12Paise: number };
+  byType: { type: HoldingType; investedPaise: number; valuePaise: number; count: number }[];
+  timeline: { month: string; investedPaise: number; valuePaise: number; putInPaise: number }[];
+  holdings: Holding[];
+  sips: Commitment[];
+}
 
 export interface PremiumSummary {
   basis: 'calendar' | 'fy';

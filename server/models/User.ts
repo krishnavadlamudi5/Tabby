@@ -27,6 +27,7 @@ export interface UserPreferences {
   reportBasis?: 'fy' | 'calendar';
   currency?: string;
   largeDebitPaise?: number;
+  monthlyBudgetPaise?: number;
   /** Per alert group: off / in-app only / in-app + email. */
   alerts?: Partial<Record<string, AlertChannel>>;
 }

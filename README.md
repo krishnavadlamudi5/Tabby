@@ -18,8 +18,21 @@ How builds, APKs and in-app OTA updates work:
 
 Under the **Money** tab: one ledger across all your bank accounts and cards,
 built from bank alert emails (pushed from Gmail by a free Apps Script) and
-statements you upload, with categories, budgets, splits, trips, insurance
-policies, an encrypted document vault, EMIs/SIPs/subscriptions and alerts.
+statements you upload. Four pages:
+
+- **Overview:** one card each for spending, insurance and investments, plus
+  what's due soon and alerts.
+- **Spending:** any month, quarter, year (FY or calendar) or custom dates; a
+  pie by category, day/month trend, top places, monthly budgets (overall and
+  per category, alerts at 80% and 100%), bills due, and the payment list with
+  a Split button to share a payment with a group.
+- **Insurance:** premiums paid this year, renewals due in 30 days with Renew
+  links, filters by person and type, charts, and the year-by-year table.
+- **Investments:** mutual funds, stocks, FDs, PPF/EPF, NPS, gold with value
+  history, gains, SIPs and money put in each month.
+
+Setup screens (bank accounts, categories, statement import, documents, PDF
+passwords) live under **Settings → Money**.
 It runs entirely on free tiers and uses no AI: known bank formats are read
 by exact parsers, anything else waits in the review queue.
 

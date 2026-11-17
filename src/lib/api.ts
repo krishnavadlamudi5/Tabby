@@ -133,6 +133,7 @@ export interface Preferences {
   reportBasis?: 'fy' | 'calendar';
   currency?: string;
   largeDebitPaise?: number | null;
+  monthlyBudgetPaise?: number | null;
   alerts?: Partial<Record<string, AlertChannel>>;
 }
 

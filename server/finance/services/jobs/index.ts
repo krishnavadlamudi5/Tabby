@@ -3,6 +3,7 @@ import { commitmentWatch } from '../commitments';
 import { linkPremiums } from '../insurance';
 import { sendAlertEmails } from '../mail';
 import { refundWatch } from './refundWatch';
+import { budgetWatch } from '../spending';
 import { documentExpiryReminders, purgeOldBodies, renewalReminders } from './reminders';
 
 export const JOBS = {
@@ -15,6 +16,7 @@ export const JOBS = {
     for (const p of await Policy.find({ status: { $in: ['active', 'renewal_due', 'renewed'] } })) n += (await linkPremiums(p.ownerId, p)).length;
     return n;
   },
+  budgetWatch: (now: Date) => budgetWatch(now),
   purgeOldBodies: (now: Date) => purgeOldBodies(now),
   sendAlertEmails: (now: Date) => sendAlertEmails(now),
 } as const;
@@ -23,8 +25,8 @@ export type JobName = keyof typeof JOBS | 'daily' | 'hourly';
 
 // daily = 08:00 IST full run; hourly = cheap checks + emails.
 const GROUPS: Record<'daily' | 'hourly', (keyof typeof JOBS)[]> = {
-  daily: ['linkPremiums', 'commitmentWatch', 'refundWatch', 'renewalReminders', 'documentExpiryReminders', 'purgeOldBodies', 'sendAlertEmails'],
-  hourly: ['commitmentWatch', 'refundWatch', 'sendAlertEmails'],
+  daily: ['linkPremiums', 'commitmentWatch', 'refundWatch', 'renewalReminders', 'documentExpiryReminders', 'budgetWatch', 'purgeOldBodies', 'sendAlertEmails'],
+  hourly: ['commitmentWatch', 'refundWatch', 'budgetWatch', 'sendAlertEmails'],
 };
 
 export async function runJob(name: JobName, now = new Date()): Promise<Record<string, unknown>> {

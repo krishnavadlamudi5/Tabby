@@ -6,7 +6,7 @@ export const ALERT_GROUP: Record<string, string> = {
   renewal: 'renewals', due: 'commitments', commitment_missed: 'commitments', commitment_failed: 'commitments', action_needed: 'commitments',
   declined: 'declined', large_debit: 'large_debit', refund_overdue: 'refunds', document_expiry: 'documents',
   statement_mismatch: 'statements', statement_password: 'statements', policy_added: 'policies', policy_updated: 'policies',
-  unknown_account: 'new_accounts',
+  unknown_account: 'new_accounts', budget: 'budgets',
 };
 
 export interface NewAlert {

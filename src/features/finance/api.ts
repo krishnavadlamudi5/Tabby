@@ -1,6 +1,6 @@
 import { apiDownload, apiRequest } from '../../lib/api';
 import type {
-  Account, Alert, Category, Claim, Commitment, Dashboard, FinDocument, Person, Policy, PolicyExtraction, PremiumSummary, ReviewEvent, YearReport, Rule, SplitTemplate, Statement, Transaction,
+  Account, Alert, Category, Claim, Commitment, Dashboard, FinDocument, Holding, InvestmentSummary, Person, SpendingSummary, Policy, PolicyExtraction, PremiumSummary, ReviewEvent, YearReport, Rule, SplitTemplate, Statement, Transaction,
 } from './types';
 
 const F = '/finance';
@@ -11,6 +11,9 @@ const qs = (params: Record<string, string | number | boolean | undefined | null>
 
 export interface TxnFilters {
   month?: string;
+  /** India dates YYYY-MM-DD, both inclusive. */
+  from?: string;
+  to?: string;
   accountId?: string;
   categoryId?: string;
   kind?: string;
@@ -109,6 +112,12 @@ export const financeApi = {
 
   trip: (groupId: string) => apiRequest<{ group: any; personal: Transaction[]; suggestions: Transaction[]; summary: { totalPaise: number; sharedPaise: number; myPersonalPaise: number; budgetPaise: number | null; remainingPaise: number | null; byCategory: { name: string; amountPaise: number }[]; perPerson: { userId: string; paidPaise: number; sharePaise: number }[] } }>(`${F}/trips/${encodeURIComponent(groupId)}`),
   updateTrip: (groupId: string, body: Record<string, unknown>) => apiRequest<{ group: any }>(`${F}/trips/${encodeURIComponent(groupId)}`, { method: 'PATCH', body }),
+
+  spending: (from: string, to: string) => apiRequest<SpendingSummary>(`${F}/spending${qs({ from, to })}`),
+  investments: () => apiRequest<InvestmentSummary>(`${F}/investments`),
+  createHolding: (body: Record<string, unknown>) => apiRequest<{ holding: Holding }>(`${F}/investments`, { method: 'POST', body }),
+  updateHolding: (id: string, body: Record<string, unknown>) => apiRequest<{ holding: Holding }>(`${F}/investments/${id}`, { method: 'PATCH', body }),
+  deleteHolding: (id: string) => apiRequest(`${F}/investments/${id}`, { method: 'DELETE' }),
 
   exportAll: () => apiDownload(`${F}/export`),
 };

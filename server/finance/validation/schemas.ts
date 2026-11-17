@@ -3,6 +3,7 @@ import { ACCOUNT_TYPES, TXN_CHANNELS, TXN_KINDS, TXN_STATUSES } from '../models/
 import { POLICY_TYPES, PREMIUM_FREQUENCIES, POLICY_STATUSES } from '../models/insurance';
 import { DOCUMENT_TYPES, LINK_KINDS } from '../models/vault';
 import { COMMITMENT_TYPES, COMMITMENT_STATUSES, FREQUENCIES } from '../models/planning';
+import { HOLDING_TYPES } from '../models/investments';
 
 /**
  * Update (PATCH) schema from a create schema: every field optional and NO
@@ -273,6 +274,30 @@ export const commitmentCreate = z.object({
   policyId: objectId.nullable().default(null),
 });
 export const commitmentUpdate = patchOf(commitmentCreate);
+
+// --- Investments
+export const holdingCreate = z.object({
+  name: shortText.min(1),
+  type: z.enum(HOLDING_TYPES).default('mutual_fund'),
+  provider: shortText.default(''),
+  reference: shortText.default(''),
+  investedPaise: paise.default(0),
+  currentValuePaise: paise.default(0),
+  valueAsOf: dateLike.optional(),
+  startDate: dateLike.nullable().optional(),
+  maturityDate: dateLike.nullable().optional(),
+  interestRatePct: z.number().min(0).max(100).nullable().optional(),
+  commitmentId: objectId.nullable().default(null),
+  notes: longText.default(''),
+  isActive: z.boolean().default(true),
+});
+export const holdingUpdate = patchOf(holdingCreate);
+
+/** Spending summary period: whole India days, `to` inclusive. */
+export const periodQuery = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD'),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD'),
+});
 
 // --- Trips (extra fields on existing groups)
 export const tripUpdate = z.object({
