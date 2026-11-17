@@ -9,7 +9,7 @@
  *
  * Setup: see README.md in this folder. Secrets live in Script Properties,
  * never in this file:
- *   TABBY_INGEST_URL     https://tabby-6i0f.onrender.com/api/finance/ingest/email
+ *   TABBY_INGEST_URL     https://tabby-api-bpb4.onrender.com/api/finance/ingest/email
  *   TABBY_HMAC_SECRET    same value as INGEST_HMAC_SECRET on Render
  */
 

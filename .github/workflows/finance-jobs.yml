@@ -29,7 +29,7 @@ jobs:
       - name: Call jobs endpoint
         env:
           JOBS_SECRET: ${{ secrets.TABBY_JOBS_SECRET }}
-          API_URL: ${{ vars.TABBY_API_URL || 'https://tabby-6i0f.onrender.com/api' }}
+          API_URL: ${{ vars.TABBY_API_URL || 'https://tabby-api-bpb4.onrender.com/api' }}
           SCHEDULE: ${{ github.event.schedule }}
           INPUT_JOB: ${{ inputs.job }}
         run: |

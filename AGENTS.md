@@ -3,7 +3,7 @@
 ## Core Architecture & Workflow Rules
 
 ### 1. Established Infrastructure (Mandatory)
-* **Backend:** Render (`https://tabby-6i0f.onrender.com/api`) + MongoDB Atlas.
+* **Backend:** Render (`https://tabby-api-bpb4.onrender.com/api`) + MongoDB Atlas.
 * **Frontend Web:** Netlify (SPA routing configured via `public/_redirects`).
 * **Mobile Client:** Android Capacitor 8.5+ with `@capgo/capacitor-updater`.
 * **CI/CD & OTA Updates:** GitHub Actions (`build-apk.yml` & `deploy-live-update.yml`).

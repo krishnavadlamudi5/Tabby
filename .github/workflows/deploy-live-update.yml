@@ -48,7 +48,7 @@ jobs:
       - name: Build Web Application
         run: npm run build
         env:
-          VITE_API_URL: https://tabby-6i0f.onrender.com/api
+          VITE_API_URL: https://tabby-api-bpb4.onrender.com/api
           VITE_GOOGLE_CLIENT_ID: 888676247797-cn7buordb6vqmd7qm6a35u8n6smievcr.apps.googleusercontent.com
           VITE_APP_VERSION: ${{ steps.version.outputs.version }}
           VITE_APP_COMMIT: ${{ github.sha }}
