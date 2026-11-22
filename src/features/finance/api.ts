@@ -4,6 +4,17 @@ import type {
 } from './types';
 
 const F = '/finance';
+
+export interface GmailStatus {
+  available: boolean;
+  connected: boolean;
+  email: string | null;
+  connectedAt: string | null;
+  lastSyncAt: string | null;
+  imported: number;
+  lastError: string | null;
+  backfillDays: number;
+}
 const qs = (params: Record<string, string | number | boolean | undefined | null>) => {
   const p = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '');
   return p.length ? `?${p.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join('&')}` : '';
@@ -70,6 +81,10 @@ export const financeApi = {
   ruleFromReview: (id: string, body: Record<string, unknown>) => apiRequest(`${F}/review/${id}/rule`, { method: 'POST', body }),
 
   ingestStatus: () => apiRequest<{ configured: boolean; isIngestOwner: boolean; lastReceivedAt: string | null; lastSubject: string | null; emailsThisWeek: number; emailsTotal: number; needsReview: number; features: { encryption: boolean; documentsStorage: string; aiBackup: boolean; alertEmails: boolean } }>(`${F}/ingest/status`),
+  gmailStatus: () => apiRequest<GmailStatus>(`${F}/gmail`),
+  gmailConnect: () => apiRequest<{ url: string }>(`${F}/gmail/connect`, { method: 'POST', body: {} }),
+  gmailSync: () => apiRequest<{ checked: number; imported: number; remaining: number; error?: string }>(`${F}/gmail/sync`, { method: 'POST', body: {} }),
+  gmailDisconnect: () => apiRequest<{ success: boolean }>(`${F}/gmail`, { method: 'DELETE' }),
   ingestManual: (body: Record<string, unknown>) => apiRequest<{ status: string; reviewReason?: string; transactionIds: string[]; detectedType: string }>(`${F}/ingest/manual`, { method: 'POST', body }),
 
   policies: () => apiRequest<{ policies: Policy[] }>(`${F}/policies`),

@@ -40,4 +40,6 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Read bank/card alert SMS (asked only when you turn on SMS import). -->
+    <uses-permission android:name="android.permission.READ_SMS" />
 </manifest>

@@ -143,6 +143,8 @@ export function summarizeReleaseNotes(body: string | null | undefined): string {
         .trim()
     )
     .filter(Boolean)
+    // Markdown rules ("---") and similar separators carry no text.
+    .filter((l) => !/^[-*_=~\s]{3,}$/.test(l))
     // A merge commit's first line ("Merge pull request #5 from …") says
     // nothing; the PR title on the next line does.
     .filter((l) => !/^Merge (pull request|branch|remote-tracking)/i.test(l));

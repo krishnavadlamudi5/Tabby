@@ -24,7 +24,7 @@ type RawDoc = HydratedDocument<IRawEvent>;
 
 export interface IngestInput {
   ownerId: string;
-  source: 'gmail' | 'manual' | 'receipt';
+  source: 'gmail' | 'manual' | 'receipt' | 'sms';
   sourceId: string;
   sender: string;
   subject: string;

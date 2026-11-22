@@ -10,6 +10,8 @@ import ee.forgr.capacitor.social.login.ModifiedMainActivityForSocialLoginPlugin;
 public class MainActivity extends BridgeActivity implements ModifiedMainActivityForSocialLoginPlugin {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Local plugins must be registered before super.onCreate().
+        registerPlugin(SmsInboxPlugin.class);
         super.onCreate(savedInstanceState);
         try {
             WebView webView = getBridge().getWebView();

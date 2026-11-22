@@ -14,6 +14,7 @@ import { BUILD_INFO, type UpdateCheckResult } from '../../hooks/useLiveUpdate';
 import { financeApi, saveBlob } from '../../features/finance/api';
 import { openExternal } from '../../features/finance/insurers';
 import { Badge, Button, Card, Field, Select, TextInput, fmtDate, useAsync } from '../../features/finance/components/ui';
+import AutoImport from '../../features/finance/components/AutoImport';
 import type { SettingsSection } from './ProfileMenu';
 import type { FinanceTab } from '../../features/finance/types';
 
@@ -184,9 +185,10 @@ export default function SettingsView({ section, onBack, onNavigateFinance, liveU
     const lastAgo = s?.lastReceivedAt ? Math.round((Date.now() - new Date(s.lastReceivedAt).getTime()) / 3_600_000) : null;
     return (
       <Section id="money" title="Money" icon={<Wallet className="w-4 h-4" />}>
+        <AutoImport />
         <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#E6E1DA] flex flex-col gap-1 text-xs">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-bold inline-flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Gmail import</span>
+            <span className="font-bold inline-flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> Gmail script (optional)</span>
             {!s ? <Badge>Checking…</Badge> : !s.configured ? <Badge tone="red">Not set up</Badge> : !s.isIngestOwner ? <Badge tone="amber">Another account</Badge> : lastAgo === null ? <Badge tone="amber">Waiting for first email</Badge> : lastAgo > 48 ? <Badge tone="amber">Quiet for {Math.round(lastAgo / 24)} days</Badge> : <Badge tone="green">Working</Badge>}
           </div>
           {s && (

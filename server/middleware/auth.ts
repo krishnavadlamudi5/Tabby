@@ -18,7 +18,7 @@ interface TokenPayload {
 }
 
 // Read lazily (not at import time) so tests and scripts can set the env first.
-function jwtSecret(): string {
+export function jwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('JWT_SECRET is not set');
   return secret;

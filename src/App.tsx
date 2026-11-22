@@ -32,6 +32,8 @@ import { User, Expense } from './types';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { useLiveUpdate } from './hooks/useLiveUpdate';
 import { useUnreadActivityCount } from './lib/activityRead';
+import { isSmsImportEnabled, syncSms } from './features/finance/sms';
+import { financeApi } from './features/finance/api';
 
 export default function App() {
   const {
@@ -153,6 +155,32 @@ export default function App() {
     }, 15000);
 
     return () => clearInterval(interval);
+  }, [authStatus, currentUser?.id]);
+
+  // Automatic SMS import (Android, once turned on in Settings → Money):
+  // on open and whenever the app comes back to the foreground.
+  useEffect(() => {
+    if (authStatus !== 'signedIn' || !currentUser?.id) return;
+    const userId = currentUser.id;
+    const runSms = () => {
+      if (document.visibilityState !== 'visible' || !isSmsImportEnabled(userId)) return;
+      syncSms(userId).catch((err) => console.warn('SMS import failed:', err));
+    };
+    // Gmail (if connected): ask the server to pull new emails, at most every
+    // 15 minutes. The scheduled jobs also do this every few hours.
+    const runGmail = () => {
+      if (document.visibilityState !== 'visible') return;
+      const key = `tabby_gmail_sync_${userId}`;
+      let last = 0;
+      try { last = Number(localStorage.getItem(key)) || 0; } catch { /* ignore */ }
+      if (Date.now() - last < 15 * 60_000) return;
+      try { localStorage.setItem(key, String(Date.now())); } catch { /* ignore */ }
+      financeApi.gmailSync().catch(() => { /* not connected, or offline */ });
+    };
+    const onVisible = () => { runSms(); runGmail(); };
+    onVisible();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [authStatus, currentUser?.id]);
 
   // Selectors
