@@ -157,6 +157,15 @@ export const manualIngest = z.object({
   subject: z.string().max(500).default(''),
   receivedAt: dateLike.optional(),
 });
+export const smsIngest = z.object({
+  messages: z.array(z.object({
+    /** Sender as the phone shows it, e.g. "VM-HDFCBK-S". */
+    address: z.string().min(1).max(40),
+    body: z.string().min(1).max(2000),
+    /** When the SMS arrived (ms since epoch or ISO). */
+    date: dateLike,
+  })).min(1).max(200),
+});
 export const emailIngest = z.object({
   messageId: z.string().min(1).max(200),
   threadId: z.string().max(200).optional(),

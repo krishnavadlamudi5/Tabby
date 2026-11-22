@@ -4,3 +4,4 @@ export * from './insurance';
 export * from './vault';
 export * from './planning';
 export * from './investments';
+export * from './gmail';

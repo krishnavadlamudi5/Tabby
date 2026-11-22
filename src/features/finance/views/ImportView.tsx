@@ -3,6 +3,7 @@ import { ClipboardPaste, Download, Mail } from 'lucide-react';
 import { financeApi, saveBlob } from '../api';
 import { Button, Card, Field, SectionTitle, TextArea, TextInput, toastError, toastOk } from '../components/ui';
 import type { FinanceTab } from '../types';
+import AutoImport from '../components/AutoImport';
 
 export default function ImportView({ onNavigate }: { onNavigate: (tab: FinanceTab) => void }) {
   const [text, setText] = useState('');
@@ -30,6 +31,11 @@ export default function ImportView({ onNavigate }: { onNavigate: (tab: FinanceTa
 
   return (
     <div className="flex flex-col gap-4">
+      <Card className="flex flex-col gap-2">
+        <SectionTitle>Automatic import</SectionTitle>
+        <AutoImport />
+      </Card>
+
       <Card className="flex flex-col gap-3">
         <SectionTitle><span className="inline-flex items-center gap-1"><ClipboardPaste className="w-3.5 h-3.5" /> Paste an email or SMS</span></SectionTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -47,7 +53,7 @@ export default function ImportView({ onNavigate }: { onNavigate: (tab: FinanceTa
       </Card>
 
       <Card className="flex flex-col gap-2 text-xs">
-        <SectionTitle><span className="inline-flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> Automatic Gmail import</span></SectionTitle>
+        <SectionTitle><span className="inline-flex items-center gap-1"><Mail className="w-3.5 h-3.5" /> Gmail script (optional alternative)</span></SectionTitle>
         <p className="text-[#736F6A]">A small Google Apps Script in your Gmail pushes bank and payment emails to Tabby every 10 minutes, signed so nobody else can post to your ledger. It's free and never shares your Gmail login.</p>
         <ol className="list-decimal pl-5 text-[#736F6A] flex flex-col gap-1">
           <li>On Render set <code>INGEST_HMAC_SECRET</code> and <code>INGEST_OWNER_EMAIL</code> (your Google sign-in email).</li>

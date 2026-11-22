@@ -50,7 +50,7 @@ export const Account = model<IAccount>('FinAccount', AccountSchema);
 
 // ---------------------------------------------------------------- RawEvent
 
-export const RAW_SOURCES = ['gmail', 'statement', 'manual', 'receipt'] as const;
+export const RAW_SOURCES = ['gmail', 'statement', 'manual', 'receipt', 'sms'] as const;
 export const RAW_STATUSES = ['parsed', 'needs_review', 'ignored', 'error'] as const;
 
 export interface IRawEvent {

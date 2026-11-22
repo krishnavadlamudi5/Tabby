@@ -14,6 +14,7 @@ import receiptRoutes from './routes/receipt';
 import financeRoutes from './finance/routes';
 import { emailIngestRouter } from './finance/routes/ingest';
 import { jobsRouter } from './finance/routes/planning';
+import { gmailCallbackRouter } from './finance/routes/gmail';
 
 // ---------------------------------------------------------------------------
 // CORS allowlist
@@ -112,6 +113,9 @@ export function createApp() {
   app.use('/api/sync', syncRoutes);
   app.use('/api/receipt', receiptRoutes);
   app.use('/api/finance/jobs', jobsRouter);
+  // Google's redirect after "Connect Gmail" carries no session; it is
+  // authenticated by the signed `state` instead.
+  app.use('/api/finance/gmail/callback', gmailCallbackRouter);
   app.use('/api/finance', financeRoutes);
 
   // Anything else under /api is an unknown route - still JSON, never HTML.

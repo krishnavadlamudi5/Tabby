@@ -3,6 +3,7 @@ import { commitmentWatch } from '../commitments';
 import { linkPremiums } from '../insurance';
 import { sendAlertEmails } from '../mail';
 import { refundWatch } from './refundWatch';
+import { syncAllGmail } from '../gmail';
 import { budgetWatch } from '../spending';
 import { documentExpiryReminders, purgeOldBodies, renewalReminders } from './reminders';
 
@@ -19,14 +20,15 @@ export const JOBS = {
   budgetWatch: (now: Date) => budgetWatch(now),
   purgeOldBodies: (now: Date) => purgeOldBodies(now),
   sendAlertEmails: (now: Date) => sendAlertEmails(now),
+  gmailSync: (now: Date) => syncAllGmail(now),
 } as const;
 
 export type JobName = keyof typeof JOBS | 'daily' | 'hourly';
 
 // daily = 08:00 IST full run; hourly = cheap checks + emails.
 const GROUPS: Record<'daily' | 'hourly', (keyof typeof JOBS)[]> = {
-  daily: ['linkPremiums', 'commitmentWatch', 'refundWatch', 'renewalReminders', 'documentExpiryReminders', 'budgetWatch', 'purgeOldBodies', 'sendAlertEmails'],
-  hourly: ['commitmentWatch', 'refundWatch', 'budgetWatch', 'sendAlertEmails'],
+  daily: ['gmailSync', 'linkPremiums', 'commitmentWatch', 'refundWatch', 'renewalReminders', 'documentExpiryReminders', 'budgetWatch', 'purgeOldBodies', 'sendAlertEmails'],
+  hourly: ['gmailSync', 'commitmentWatch', 'refundWatch', 'budgetWatch', 'sendAlertEmails'],
 };
 
 export async function runJob(name: JobName, now = new Date()): Promise<Record<string, unknown>> {
