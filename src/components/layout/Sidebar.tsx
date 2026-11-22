@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Grid, Bell, Settings, Search, X, Plus, UserPlus, Wallet } from 'lucide-react';
 import AppLogo from '../AppLogo';
 import { FINANCE_TABS } from '../../features/finance/FinanceApp';
+import { useUnreadActivityCount } from '../../lib/activityRead';
 import { useAppStore } from '../../store/useAppStore';
 
 interface SidebarProps {
@@ -29,6 +30,7 @@ export default function Sidebar({
   const groups = useAppStore(state => state.groups);
   const users = useAppStore(state => state.users);
   const activities = useAppStore(state => state.activities);
+  const unreadCount = useUnreadActivityCount(activities, currentUser?.id);
 
 
   const [sidebarSearchQuery, setSidebarSearchQuery] = useState('');
@@ -102,7 +104,7 @@ export default function Sidebar({
             title="Notifications"
           >
             <Bell className="w-4 h-4" />
-            {activities.length > 0 && (
+            {unreadCount > 0 && (
               <span className="w-2 h-2 rounded-full bg-[#C86D51] absolute top-1 right-1 ring-2 ring-white" />
             )}
           </button>
@@ -142,9 +144,9 @@ export default function Sidebar({
           >
             <Bell className="w-4 h-4" />
             <span className="flex-1 text-left">Notifications</span>
-            {activities.length > 0 && (
+            {unreadCount > 0 && (
               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${activeView.type === 'notifications' ? 'bg-white text-[#3C5A48]' : 'bg-[#EBF1ED] text-[#3C5A48]'}`}>
-                {activities.length}
+                {unreadCount}
               </span>
             )}
           </button>

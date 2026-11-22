@@ -69,7 +69,6 @@ interface AppState extends UserData {
   saveExpense: (expenseData: Omit<Expense, 'id' | 'createdBy' | 'createdAt'> | Expense) => void;
   deleteExpense: (expenseId: string) => void;
   settleDebt: (fromUserId: string, toUserId: string, amount: number, groupId: string | null) => void;
-  simulateAppUpdate: () => void;
 }
 
 // --- Local cache (per user) -------------------------------------------
@@ -542,19 +541,5 @@ export const useAppStore = create<AppState>((set, get) => {
       useToastStore.getState().addToast('Settlement recorded', 'success');
     },
 
-    simulateAppUpdate: () => {
-      const { currentUser, activities } = get();
-      const updateAct: Activity = {
-        id: `act-update-${Date.now()}`,
-        type: 'app_update' as any,
-        userId: currentUser?.id || DEMO_USER_ID,
-        description: '🚀 Tabby System Update v1.2 installed: Added category pie charts, bar comparison, and fast contact search.',
-        timestamp: new Date().toISOString(),
-      };
-      send({ kind: 'saveActivity', payload: updateAct });
-      set({ activities: [updateAct, ...activities] });
-
-      useToastStore.getState().addToast('Simulated a new update!', 'activity');
-    },
   };
 });

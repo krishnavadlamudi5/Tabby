@@ -1,6 +1,7 @@
 import React from 'react';
 import { Menu, X, Bell, Sparkles } from 'lucide-react';
 import AppLogo from '../AppLogo';
+import { useUnreadActivityCount } from '../../lib/activityRead';
 import { useAppStore } from '../../store/useAppStore';
 
 interface MobileHeaderProps {
@@ -20,6 +21,7 @@ export default function MobileHeader({
 }: MobileHeaderProps) {
   const currentUser = useAppStore(state => state.currentUser);
   const activities = useAppStore(state => state.activities);
+  const unreadCount = useUnreadActivityCount(activities, currentUser?.id);
 
   if (!currentUser) return null;
 
@@ -62,7 +64,7 @@ export default function MobileHeader({
           type="button"
         >
           <Bell className={`w-5 h-5 ${activeView.type === 'notifications' ? 'animate-none' : 'origin-top'}`} />
-          {activities.length > 0 && (
+          {unreadCount > 0 && (
             <div className="absolute -top-1 -right-1">
               <span className="w-3 h-3 rounded-full bg-rose-500 absolute inset-0 ring-2 ring-white z-10" />
               <span className="w-3 h-3 rounded-full bg-rose-500 absolute inset-0 animate-ping opacity-75" />
