@@ -31,6 +31,7 @@ import { useAppStore } from './store/useAppStore';
 import { User, Expense } from './types';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { useLiveUpdate } from './hooks/useLiveUpdate';
+import { useUnreadActivityCount } from './lib/activityRead';
 
 export default function App() {
   const {
@@ -55,7 +56,6 @@ export default function App() {
     saveExpense,
     deleteExpense,
     settleDebt,
-    simulateAppUpdate,
     authStatus,
     signOut,
   } = useAppStore();
@@ -185,11 +185,14 @@ export default function App() {
   const myActivities = useMemo(() => {
     if (!currentUser) return [];
     return activities.filter((act) => {
-      if (act.type === 'app_update') return true;
+      // 'app_update' entries were fake ones from the old "Check Updates" button.
+      if (act.type === 'app_update') return false;
       if (act.userId === currentUser.id) return true;
       return myGroups.some((g) => act.description.includes(g.name));
     });
   }, [activities, myGroups, currentUser]);
+
+  const unreadActivityCount = useUnreadActivityCount(myActivities, currentUser?.id);
 
   const activeGroup = activeView.type === 'group' ? groups.find((g) => g.id === activeView.id) : null;
   const activeFriend = activeView.type === 'friend' ? users.find((u) => u.id === activeView.id) : null;
@@ -407,14 +410,11 @@ export default function App() {
                 activities={myActivities}
                 onNavigateToGroup={(gid) => setActiveView({ type: 'group', id: gid })}
                 onNavigateToFriend={(fid) => setActiveView({ type: 'friend', id: fid })}
-                onSimulateAppUpdate={() => {
-                  simulateAppUpdate();
-                  setIsAppUpdateAvailable(true);
-                  setShowAppUpdateBanner(true);
-                }}
+                isUpdateAvailable={isLiveUpdateAvailable}
                 onApplyLiveUpdate={applyLiveUpdate}
                 isDownloadingUpdate={isLiveDownloading}
                 liveLatestVersion={liveLatestVersion}
+                liveReleaseNotes={liveReleaseNotes}
               />
             )}
           </div>
@@ -489,7 +489,7 @@ export default function App() {
         >
           <div className={`p-1 rounded-lg relative ${activeView.type === 'notifications' ? 'bg-[#3C5A48] text-white' : ''}`}>
             <Bell className="w-5 h-5" />
-            {activities.length > 0 && <span className="w-2 h-2 rounded-full bg-[#C86D51] absolute top-0.5 right-0.5 ring-2 ring-white" />}
+            {unreadActivityCount > 0 && <span className="w-2 h-2 rounded-full bg-[#C86D51] absolute top-0.5 right-0.5 ring-2 ring-white" />}
           </div>
           <span className="text-[10px] tracking-tight">Activity</span>
         </button>

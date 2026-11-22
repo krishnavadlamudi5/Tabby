@@ -33,22 +33,21 @@ export default function SyncIndicator() {
 
   return (
     <div
-      className="fixed z-40 right-3 bottom-24 lg:bottom-6 flex items-center gap-2 bg-[#FFF8E6] border border-[#E9C46A] rounded-full pl-3 pr-1 py-1 shadow-md text-xs"
+      className="fixed z-40 right-3 bottom-24 lg:bottom-6"
       role="status"
       id="sync-pending-indicator"
     >
-      <CloudOff className="w-3.5 h-3.5 text-[#9A6B00]" />
-      <span className="font-semibold text-[#6B4A00]">
-        {pendingCount === 1 ? '1 change' : `${pendingCount} changes`} pending sync
-      </span>
+      {/* Compact on phones so it doesn't cover the list; tap to retry. */}
       <button
         type="button"
         onClick={retrySync}
-        className="ml-1 p-1.5 rounded-full hover:bg-[#F5E3B3] text-[#6B4A00] cursor-pointer"
-        aria-label="Retry sync now"
-        title="Retry now"
+        className="flex items-center gap-1.5 bg-[#FFF8E6]/95 backdrop-blur-sm border border-[#E9C46A] rounded-full px-2.5 py-1.5 shadow-sm text-[11px] font-semibold text-[#6B4A00] hover:bg-[#F5E3B3] cursor-pointer"
+        aria-label={`${pendingCount} unsynced ${pendingCount === 1 ? 'change' : 'changes'}. Tap to retry.`}
+        title="Waiting to sync. Tap to retry now."
       >
-        <RefreshCw className="w-3.5 h-3.5" />
+        <CloudOff className="w-3.5 h-3.5 text-[#9A6B00]" />
+        <span>{pendingCount}<span className="hidden sm:inline"> {pendingCount === 1 ? 'change' : 'changes'} pending sync</span></span>
+        <RefreshCw className="w-3 h-3" />
       </button>
     </div>
   );

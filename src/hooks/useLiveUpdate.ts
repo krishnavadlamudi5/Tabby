@@ -125,6 +125,30 @@ function describeUpdateError(err: any): string {
   return parts.join(' — ');
 }
 
+/**
+ * Release bodies are Markdown ("### 🚀 What's New in this Update: ...").
+ * Banners show one line, so strip the Markdown and keep the first real text.
+ */
+export function summarizeReleaseNotes(body: string | null | undefined): string {
+  const lines = (body || '')
+    .split('\n')
+    .map((l) =>
+      l
+        .replace(/^\s*#{1,6}\s*/, '')
+        .replace(/^\s*[-*+]\s+/, '')
+        .replace(/[*_`]/g, '')
+        .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+        .replace(/^\s*🚀\s*/u, '')
+        .replace(/^What's New in this Update:?\s*/i, '')
+        .trim()
+    )
+    .filter(Boolean)
+    // A merge commit's first line ("Merge pull request #5 from …") says
+    // nothing; the PR title on the next line does.
+    .filter((l) => !/^Merge (pull request|branch|remote-tracking)/i.test(l));
+  return lines[0] || 'New improvements and fixes.';
+}
+
 export function useLiveUpdate(): LiveUpdateState {
   const [isUpdateAvailable, setIsUpdateAvailable] = useState<boolean>(false);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
@@ -213,7 +237,7 @@ export function useLiveUpdate(): LiveUpdateState {
       if (isNewerVersion(remoteVersion, currentVersion)) {
         setLatestVersion(remoteVersion);
         setDownloadUrl(zipAsset.browser_download_url);
-        setReleaseNotes(release.body || 'New enhancements and bug fixes.');
+        setReleaseNotes(summarizeReleaseNotes(release.body));
         setIsUpdateAvailable(true);
 
         if (!dismissedVersion || dismissedVersion !== remoteVersion || isManualCheck) {
